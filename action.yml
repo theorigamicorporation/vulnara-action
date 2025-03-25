@@ -1,0 +1,36 @@
+name: 'Vulnara-Scan'
+description: 'Scan a repository for vulnerabilities'
+inputs:
+  repository_id:
+    description: 'Repository ID'
+    required: true
+  git_token_id:
+    description: 'Git token ID'
+    required: false
+  scan_image:
+    description: 'Scan image'
+    required: false
+  docker_scan_tool_id:
+    description: 'Scan tool ID'
+    required: false
+  branch:
+    description: 'Branch name'
+    required: false
+    default: 'main'
+  create_issue:
+    description: 'Create issue for each vulnerability'
+    required: true
+    default: 'false'
+  auto_remediate:
+    description: 'Auto remediate vulnerabilities'
+    required: true
+    default: 'false'
+  service_account:
+    description: 'Service account JSON'
+    required: true
+outputs:
+  response_status:
+    description: 'The status of the scan response'
+runs:
+  using: 'docker'
+  image: 'docker://vulnara/vulnara-scan:latest' # TODO: add image
