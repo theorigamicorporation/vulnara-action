@@ -1,0 +1,24 @@
+{
+  "name": "vulnara-action",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theorigamicorporation/vulnara-action.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/theorigamicorporation/vulnara-action/issues"
+  },
+  "homepage": "https://github.com/theorigamicorporation/vulnara-action#readme",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0"
+  }
+}
