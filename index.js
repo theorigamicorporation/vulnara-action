@@ -65,10 +65,9 @@ function prepare_args(repository_id, git_token_id, scan_image, docker_scan_tool_
 }
 
 function run_scan(args) {
-    const home_directory = get_home_directory();
-    const command = `vulnara scan ${args.join(' ')}`;
+    const command = `vulnara-cli ${args.join(' ')}`;
     try {
-        execSync(command, { cwd: home_directory });
+        execSync(command, { cwd: "/usr/local/bin" });
     } catch (error) {
         throw new Error("Failed to run scan");
     }
