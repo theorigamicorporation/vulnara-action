@@ -1,0 +1,72 @@
+name: 'Vulnara Scan'
+description: 'Run a Vulnara security scan on a branch from CI using a service account, and optionally gate the build on findings.'
+author: 'Vulnara'
+branding:
+  icon: 'shield'
+  color: 'purple'
+
+inputs:
+  service-account:
+    description: 'Vulnara service account username.'
+    required: true
+  token:
+    description: 'Vulnara service account token (password). Store it as a GitHub secret.'
+    required: true
+  tenant:
+    description: 'Vulnara tenant (workspace) id the service account belongs to.'
+    required: true
+  scan-tools:
+    description: 'Comma-separated scan tool ids (dockerScanToolId) to run. Find them in Vulnara under your scan tools.'
+    required: true
+  branch:
+    description: 'Branch to scan. Defaults to the branch that triggered the workflow.'
+    required: false
+    default: ''
+  repository:
+    description: 'owner/name of the repository to scan in Vulnara. Defaults to the current GitHub repository.'
+    required: false
+    default: ''
+  git-token-id:
+    description: 'Vulnara git token id to use for cloning (required for private repositories).'
+    required: false
+    default: ''
+  fail-on:
+    description: 'Fail the job if a finding at or above this severity is found: none | low | medium | high | critical.'
+    required: false
+    default: 'critical'
+  create-issue:
+    description: 'Create an issue in the repository for findings.'
+    required: false
+    default: 'false'
+  auto-remediate:
+    description: 'Open a fix pull request for findings (requires create-issue).'
+    required: false
+    default: 'false'
+  wait-timeout:
+    description: 'Max seconds to wait for the scan(s) to finish before failing.'
+    required: false
+    default: '1800'
+  poll-interval:
+    description: 'Seconds between scan status checks.'
+    required: false
+    default: '15'
+  cli-version:
+    description: 'vulnara-cli release tag to use (e.g. v1.2.3) or "latest".'
+    required: false
+    default: 'latest'
+  cli-token:
+    description: 'Token used to download the vulnara-cli release (only needed if the CLI repo is private).'
+    required: false
+    default: ''
+
+outputs:
+  scan-result-ids:
+    description: 'Space-separated ids of the scan results that were started.'
+  highest-severity:
+    description: 'The highest finding severity discovered across the scans (or "none").'
+  passed:
+    description: '"true" if the scans passed the fail-on gate, "false" otherwise.'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

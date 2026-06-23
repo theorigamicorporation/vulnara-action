@@ -1,0 +1,19 @@
+# Copy this into .github/workflows/ in your repository.
+name: Vulnara Scan
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  vulnara:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: theorigamicorporation/vulnara-action@v1
+        with:
+          service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
+          token: ${{ secrets.VULNARA_TOKEN }}
+          tenant: my-tenant
+          scan-tools: '11111111-2222-3333-4444-555555555555'
+          fail-on: high
+          # git-token-id: ${{ vars.VULNARA_GIT_TOKEN_ID }}   # for private repos
