@@ -11,24 +11,34 @@ set -euo pipefail
 log()  { echo "vulnara: $*" >&2; }
 fail() { echo "::error::$*" >&2; exit 1; }
 
+# GitHub passes Docker-action inputs as INPUT_<NAME> with dashes kept
+# (service-account -> INPUT_SERVICE-ACCOUNT), which bash can't read with ${...}.
+# Read via printenv, falling back to the underscore form.
+input() {
+  local up; up="$(echo "$1" | tr '[:lower:]' '[:upper:]')"
+  local v; v="$(printenv "INPUT_$up" 2>/dev/null || true)"
+  if [ -z "$v" ]; then v="$(printenv "INPUT_$(echo "$up" | tr '-' '_')" 2>/dev/null || true)"; fi
+  printf '%s' "$v"
+}
+
 # --- config (overridable for non-prod) ------------------------------------
-TOKEN_URL="${INPUT_TOKEN_URL:-https://auth.theorigamicorporation.com/application/o/token/}"
-GATEWAY_URL="${INPUT_GATEWAY_URL:-https://vulnara-gw.rso.dev/graphql}"
-CLIENT_ID="${INPUT_OAUTH_CLIENT_ID:-hl04e6MSMRY60LdpGh5rdMRQjkPxvldAYoqXdzo4}"
+TOKEN_URL="$(input token-url)";       [ -n "$TOKEN_URL" ]   || TOKEN_URL="https://auth.theorigamicorporation.com/application/o/token/"
+GATEWAY_URL="$(input gateway-url)";   [ -n "$GATEWAY_URL" ] || GATEWAY_URL="https://vulnara-gw.rso.dev/graphql"
+CLIENT_ID="$(input oauth-client-id)"; [ -n "$CLIENT_ID" ]   || CLIENT_ID="hl04e6MSMRY60LdpGh5rdMRQjkPxvldAYoqXdzo4"
 
 # --- inputs ---------------------------------------------------------------
-SERVICE_ACCOUNT="${INPUT_SERVICE_ACCOUNT:-}"
-TOKEN="${INPUT_TOKEN:-}"
-TENANT="${INPUT_TENANT:-}"
-SCAN_TOOLS="${INPUT_SCAN_TOOLS:-}"
-BRANCH="${INPUT_BRANCH:-${GITHUB_REF_NAME:-}}"
-REPOSITORY="${INPUT_REPOSITORY:-${GITHUB_REPOSITORY:-}}"
-GIT_TOKEN_ID="${INPUT_GIT_TOKEN_ID:-}"
-FAIL_ON="$(echo "${INPUT_FAIL_ON:-critical}" | tr '[:upper:]' '[:lower:]')"
-CREATE_ISSUE="${INPUT_CREATE_ISSUE:-false}"
-AUTO_REMEDIATE="${INPUT_AUTO_REMEDIATE:-false}"
-WAIT_TIMEOUT="${INPUT_WAIT_TIMEOUT:-1800}"
-POLL_INTERVAL="${INPUT_POLL_INTERVAL:-15}"
+SERVICE_ACCOUNT="$(input service-account)"
+TOKEN="$(input token)"
+TENANT="$(input tenant)"
+SCAN_TOOLS="$(input scan-tools)"
+BRANCH="$(input branch)";         [ -n "$BRANCH" ]     || BRANCH="${GITHUB_REF_NAME:-}"
+REPOSITORY="$(input repository)";  [ -n "$REPOSITORY" ] || REPOSITORY="${GITHUB_REPOSITORY:-}"
+GIT_TOKEN_ID="$(input git-token-id)"
+FAIL_ON="$(input fail-on | tr '[:upper:]' '[:lower:]')"; [ -n "$FAIL_ON" ] || FAIL_ON="critical"
+CREATE_ISSUE="$(input create-issue)";     [ -n "$CREATE_ISSUE" ]   || CREATE_ISSUE="false"
+AUTO_REMEDIATE="$(input auto-remediate)"; [ -n "$AUTO_REMEDIATE" ] || AUTO_REMEDIATE="false"
+WAIT_TIMEOUT="$(input wait-timeout)";     [ -n "$WAIT_TIMEOUT" ]   || WAIT_TIMEOUT="1800"
+POLL_INTERVAL="$(input poll-interval)";   [ -n "$POLL_INTERVAL" ]  || POLL_INTERVAL="15"
 
 [ -n "$SERVICE_ACCOUNT" ] || fail "service-account is required"
 [ -n "$TOKEN" ]           || fail "token is required"
