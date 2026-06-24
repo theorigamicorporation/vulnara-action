@@ -4,17 +4,17 @@ Run a [Vulnara](https://vulnara.rso.dev) security scan on a branch from your CI,
 authenticated with a **service account**, and optionally **fail the build** when
 findings are found.
 
-Under the hood it wraps [`vulnara-cli`](https://github.com/theorigamicorporation/vulnara-cli):
-it authenticates the service account, resolves the repository in Vulnara, starts
-a scan per tool on the branch, waits for them to finish, and gates the job on the
-highest finding severity.
+It talks to the Vulnara GraphQL API directly: it exchanges the service account
+for a short-lived token, resolves the repository in Vulnara, starts a scan per
+tool on the branch, waits for them to finish, and gates the job on the highest
+finding severity. No extra binaries to download.
 
 ## Prerequisites
 
 1. The repository already exists in Vulnara (add it under your workspace first).
-2. A **service account** in Vulnara (Settings -> Service Accounts) with access to
-   the tenant. Note its **username** and **token**.
-3. The **scan tool id(s)** you want to run (from your scan tools in Vulnara).
+2. A **service account** in Vulnara (Access & Security -> Service Accounts) with
+   access to the tenant. Note its **username** and **token**.
+3. The **scan tool(s)** you want to run (by name or id, e.g. `AEGIS`).
 4. For **private** repositories, a Vulnara **git token** and its id.
 
 Store the service account token as a GitHub Actions secret (e.g. `VULNARA_TOKEN`).
@@ -37,18 +37,18 @@ jobs:
           service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
           token: ${{ secrets.VULNARA_TOKEN }}
           tenant: my-tenant
-          scan-tools: '11111111-2222-3333-4444-555555555555'
-          fail-on: high            # fail the build on High or Critical findings
+          scan-tools: AEGIS         # name or id; comma-separate for several
+          fail-on: high             # fail the build on High or Critical findings
           # branch defaults to the branch that triggered the workflow
-          # git-token-id: <id>     # required for private repositories
+          # git-token-id: <id>      # required for private repositories
 ```
 
-### Outputs
+### Using outputs
 
 ```yaml
       - uses: theorigamicorporation/vulnara-action@v1
         id: vulnara
-        with: { service-account: ..., token: ..., tenant: ..., scan-tools: ... }
+        with: { service-account: ..., token: ..., tenant: ..., scan-tools: AEGIS }
       - run: echo "highest severity = ${{ steps.vulnara.outputs.highest-severity }}"
 ```
 
@@ -59,7 +59,7 @@ jobs:
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token (use a secret). |
 | `tenant` | yes | | Vulnara tenant (workspace) id. |
-| `scan-tools` | yes | | Comma-separated scan tool ids to run. |
+| `scan-tools` | yes | | Comma-separated scan tool names or ids. |
 | `branch` | no | triggering branch | Branch to scan. |
 | `repository` | no | current repo | `owner/name` to scan in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repos). |
@@ -68,8 +68,9 @@ jobs:
 | `auto-remediate` | no | `false` | Open a fix PR (requires `create-issue`). |
 | `wait-timeout` | no | `1800` | Max seconds to wait for scans. |
 | `poll-interval` | no | `15` | Seconds between status checks. |
-| `cli-version` | no | `latest` | `vulnara-cli` release tag to use. |
-| `cli-token` | no | | Token to download the CLI (only if its repo is private). |
+| `gateway-url` | no | prod | GraphQL gateway URL (override for non-prod). |
+| `token-url` | no | prod | OAuth token endpoint (override for non-prod). |
+| `oauth-client-id` | no | prod | OAuth client id for the token exchange. |
 
 ## Outputs
 
@@ -82,9 +83,9 @@ jobs:
 ## Notes
 
 - The job runs until the scan(s) complete (up to `wait-timeout`), so it acts as a
-  real security gate.
+  real security gate. The service-account token is refreshed automatically for
+  long-running scans.
 - The gate currently considers code/secret findings (`scanFindings`). Dependency
   and network findings can be added later.
-- `scan-tools` takes tool **ids**; scanning by tool **name** will be supported once
-  `vulnara-cli` exposes a scan-tools query.
-- Targets the production Vulnara API (`vulnara-gw.rso.dev`), matching `vulnara-cli`.
+- The repository must already exist in Vulnara, be **enabled**, and have access
+  to the branch (a git token for private repos).

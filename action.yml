@@ -16,7 +16,7 @@ inputs:
     description: 'Vulnara tenant (workspace) id the service account belongs to.'
     required: true
   scan-tools:
-    description: 'Comma-separated scan tool ids (dockerScanToolId) to run. Find them in Vulnara under your scan tools.'
+    description: 'Comma-separated scan tool names or ids to run (e.g. "AEGIS,pdd").'
     required: true
   branch:
     description: 'Branch to scan. Defaults to the branch that triggered the workflow.'
@@ -50,14 +50,18 @@ inputs:
     description: 'Seconds between scan status checks.'
     required: false
     default: '15'
-  cli-version:
-    description: 'vulnara-cli release tag to use (e.g. v1.2.3) or "latest".'
+  gateway-url:
+    description: 'Vulnara GraphQL gateway URL (override for non-prod).'
     required: false
-    default: 'latest'
-  cli-token:
-    description: 'Token used to download the vulnara-cli release (only needed if the CLI repo is private).'
+    default: 'https://vulnara-gw.rso.dev/graphql'
+  token-url:
+    description: 'OAuth token endpoint (override for non-prod).'
     required: false
-    default: ''
+    default: 'https://auth.theorigamicorporation.com/application/o/token/'
+  oauth-client-id:
+    description: 'OAuth client id used for the service-account token exchange (override for non-prod).'
+    required: false
+    default: 'hl04e6MSMRY60LdpGh5rdMRQjkPxvldAYoqXdzo4'
 
 outputs:
   scan-result-ids:

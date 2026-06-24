@@ -2,17 +2,19 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Vulnara Scan action. Wraps vulnara-cli: authenticate as a service account,
-# resolve the repository, start a scan per tool on the branch, wait for them to
-# finish, and gate the build on the highest finding severity.
+# Vulnara Scan action. Authenticate a service account (OAuth client_credentials
+# -> JWT), resolve the repository, start a scan per tool on the branch, wait for
+# them to finish, and gate the build on the highest finding severity. Talks to
+# the Vulnara GraphQL gateway directly (curl + jq).
 # ---------------------------------------------------------------------------
-
-CLI_REPO="theorigamicorporation/vulnara-cli"
-CLI_BIN="/usr/local/bin/vulnara-cli"
-WORK="$(mktemp -d)"
 
 log()  { echo "vulnara: $*" >&2; }
 fail() { echo "::error::$*" >&2; exit 1; }
+
+# --- config (overridable for non-prod) ------------------------------------
+TOKEN_URL="${INPUT_TOKEN_URL:-https://auth.theorigamicorporation.com/application/o/token/}"
+GATEWAY_URL="${INPUT_GATEWAY_URL:-https://vulnara-gw.rso.dev/graphql}"
+CLIENT_ID="${INPUT_OAUTH_CLIENT_ID:-hl04e6MSMRY60LdpGh5rdMRQjkPxvldAYoqXdzo4}"
 
 # --- inputs ---------------------------------------------------------------
 SERVICE_ACCOUNT="${INPUT_SERVICE_ACCOUNT:-}"
@@ -27,8 +29,6 @@ CREATE_ISSUE="${INPUT_CREATE_ISSUE:-false}"
 AUTO_REMEDIATE="${INPUT_AUTO_REMEDIATE:-false}"
 WAIT_TIMEOUT="${INPUT_WAIT_TIMEOUT:-1800}"
 POLL_INTERVAL="${INPUT_POLL_INTERVAL:-15}"
-CLI_VERSION="${INPUT_CLI_VERSION:-latest}"
-CLI_TOKEN="${INPUT_CLI_TOKEN:-}"
 
 [ -n "$SERVICE_ACCOUNT" ] || fail "service-account is required"
 [ -n "$TOKEN" ]           || fail "token is required"
@@ -49,144 +49,137 @@ case "$FAIL_ON" in
   *) fail "invalid fail-on '$FAIL_ON' (expected none|low|medium|high|critical)" ;;
 esac
 
-# --- download the CLI -----------------------------------------------------
-install_cli() {
-  local base="https://github.com/${CLI_REPO}/releases"
-  local url
-  if [ "$CLI_VERSION" = "latest" ]; then
-    url="${base}/latest/download/vulnara-cli_Linux_x86_64.tar.gz"
-  else
-    url="${base}/download/${CLI_VERSION}/vulnara-cli_Linux_x86_64.tar.gz"
+# --- auth: client_credentials -> JWT (refreshed before expiry) ------------
+JWT=""; JWT_EXP=0
+ensure_jwt() {
+  if [ "$(date +%s)" -lt "$(( JWT_EXP - 120 ))" ]; then return 0; fi
+  local resp
+  resp="$(curl -sS "$TOKEN_URL" \
+    --data-urlencode "grant_type=client_credentials" \
+    --data-urlencode "client_id=$CLIENT_ID" \
+    --data-urlencode "username=$SERVICE_ACCOUNT" \
+    --data-urlencode "password=$TOKEN" \
+    --data-urlencode "scope=profile")"
+  JWT="$(echo "$resp" | jq -r '.access_token // empty')"
+  if [ -z "$JWT" ]; then
+    echo "$resp" | jq -r '.error_description // .error // .' >&2
+    fail "could not authenticate the service account (check service-account/token/tenant)"
   fi
-  log "downloading vulnara-cli (${CLI_VERSION})"
-  local auth=()
-  if [ -n "$CLI_TOKEN" ]; then auth=(-H "Authorization: Bearer ${CLI_TOKEN}"); fi
-  curl -fsSL "${auth[@]}" "$url" -o "$WORK/cli.tgz" \
-    || fail "failed to download vulnara-cli from $url"
-  tar -xzf "$WORK/cli.tgz" -C "$WORK"
-  local bin
-  bin="$(find "$WORK" -type f -name 'vulnara-cli' | head -1)"
-  [ -n "$bin" ] || fail "vulnara-cli binary not found in release archive"
-  install -m 0755 "$bin" "$CLI_BIN"
+  local exp; exp="$(echo "$resp" | jq -r '.expires_in // 3600')"
+  JWT_EXP=$(( $(date +%s) + exp ))
 }
 
-# --- auth setup -----------------------------------------------------------
-setup_auth() {
-  mkdir -p "$HOME/.config/vulnara/sa" "$HOME/.config/vulnara/jwt" "$HOME/.config/vulnara/tenant"
-  jq -n --arg u "$SERVICE_ACCOUNT" --arg p "$TOKEN" \
-    '{username: $u, password: $p}' > "$HOME/.config/vulnara/sa/service_account.json"
-  printf '%s' "$TENANT" > "$HOME/.config/vulnara/tenant/default_tenant"
-}
-
-# --- run a CLI command, capture clean JSON to a file ----------------------
-# usage: vcli <outfile> <command> [args...]
-vcli() {
-  local out="$1"; shift
-  local cmd="$1"
-  rm -f "$out"
-  if ! "$CLI_BIN" "$@" --tenant "$TENANT" --output "$out" >"$WORK/cli.log" 2>&1; then
-    cat "$WORK/cli.log" >&2
-    fail "vulnara-cli $cmd failed"
+# --- gql: run a request body, echo .data, fail on .errors -----------------
+gql() {
+  ensure_jwt
+  local resp
+  resp="$(curl -sS "$GATEWAY_URL" \
+    -H "Authorization: Bearer $JWT" -H "X-Tenant: $TENANT" \
+    -H 'Content-Type: application/json' --data "$1")"
+  if echo "$resp" | jq -e '.errors' >/dev/null 2>&1; then
+    echo "$resp" | jq -r '.errors[] | "  \(.extensions.code // "ERROR"): \(.message)"' >&2
+    fail "GraphQL request failed"
   fi
-  if [ ! -s "$out" ] || ! jq -e . "$out" >/dev/null 2>&1; then
-    cat "$WORK/cli.log" >&2
-    fail "vulnara-cli $cmd returned no usable result"
-  fi
+  echo "$resp" | jq '.data'
 }
 
 # --- resolve the Vulnara repository id ------------------------------------
-# The repositories query exposes repositoryName + gitEntity.name (the workspace,
-# i.e. the GitHub owner), so match on those.
 resolve_repository() {
-  local owner="${REPOSITORY%%/*}" name="${REPOSITORY##*/}"
-  vcli "$WORK/repos.json" repositories --filters "repositoryName=$name"
-  local id
-  id="$(jq -r --arg o "$(echo "$owner" | tr '[:upper:]' '[:lower:]')" \
-    '[.repositories.items[] | select(((.gitEntity.name // "") | ascii_downcase) == $o)][0].id // empty' \
-    "$WORK/repos.json")"
-  if [ -z "$id" ]; then
-    # fall back to the only match if the workspace name differs from the owner
-    id="$(jq -r '.repositories.items[0].id // empty' "$WORK/repos.json")"
-  fi
+  local owner="${REPOSITORY%%/*}" name="${REPOSITORY##*/}" data id
+  data="$(gql "$(jq -n --arg n "$name" \
+    '{query:"query($l:List){repositories(list:$l){items{id repositoryName gitEntity{__typename ... on Organization{name} ... on GitUser{name}}}}}",
+      variables:{l:{filters:[{field:"repositoryName",stringEquals:$n}]}}}')")"
+  id="$(echo "$data" | jq -r --arg o "$(echo "$owner" | tr '[:upper:]' '[:lower:]')" \
+    '([.repositories.items[] | select(((.gitEntity.name // "") | ascii_downcase) == $o)][0].id)
+       // (.repositories.items[0].id) // empty')"
   [ -n "$id" ] || fail "repository '$REPOSITORY' was not found in Vulnara (tenant '$TENANT'). Add it in Vulnara first."
   echo "$id"
 }
 
-# --- scan tool ids --------------------------------------------------------
+# --- resolve scan tools (by name or id) -----------------------------------
 resolve_tools() {
+  local data; data="$(gql '{"query":"{dockerScanTools(list:{}){items{id name}}}"}')"
   local out=""
   IFS=',' read -ra wanted <<< "$SCAN_TOOLS"
   for raw in "${wanted[@]}"; do
     local t; t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
-    if [ -n "$t" ]; then out="$out $t"; fi
+    [ -n "$t" ] || continue
+    local id
+    id="$(echo "$data" | jq -r --arg t "$t" \
+      '[.dockerScanTools.items[] | select(.id == $t or (.name | ascii_downcase) == ($t | ascii_downcase))][0].id // empty')"
+    [ -n "$id" ] || fail "scan tool '$t' not found. Available: $(echo "$data" | jq -r '[.dockerScanTools.items[].name] | join(", ")')"
+    out="$out $id"
   done
-  [ -n "$out" ] || fail "no scan tool ids provided in scan-tools"
+  [ -n "$out" ] || fail "no scan tools provided"
   echo "$out"
 }
 
-# ---------------------------------------------------------------------------
-install_cli
-setup_auth
+# --- start a scan, echo the scan result id --------------------------------
+start_scan() {
+  local tool_id="$1" ci ar input
+  ci=false; if [ "$CREATE_ISSUE" = "true" ]; then ci=true; fi
+  ar=false; if [ "$AUTO_REMEDIATE" = "true" ]; then ar=true; fi
+  input="$(jq -n --arg r "$REPO_ID" --arg t "$tool_id" --arg b "$BRANCH" \
+    --argjson ci "$ci" --argjson ar "$ar" --arg gt "$GIT_TOKEN_ID" \
+    '{repositoryId:$r, dockerScanToolId:$t, branch:$b, createIssue:$ci, autoRemediate:$ar}
+       + (if $gt == "" then {} else {gitTokenId:$gt} end)')"
+  gql "$(jq -n --argjson i "$input" \
+    '{query:"mutation($i:StartRepositoryScanInput!){startRepositoryScan(input:$i){scanResult{id status}}}",variables:{i:$i}}')" \
+    | jq -r '.startRepositoryScan.scanResult.id // empty'
+}
 
+# --- wait for a scan to reach a terminal state ----------------------------
+wait_scan() {
+  local srid="$1" deadline=$(( $(date +%s) + WAIT_TIMEOUT )) status
+  while :; do
+    status="$(gql "$(jq -n --arg id "$srid" '{query:"query($id:ID!){scanResult(id:$id){status}}",variables:{id:$id}}')" \
+      | jq -r '.scanResult.status // "PENDING"')"
+    case "$(echo "$status" | tr '[:lower:]' '[:upper:]')" in
+      SUCCESS) return 0 ;;
+      FAILED|CANCELLED|ERROR) fail "scan $srid ended as $status" ;;
+    esac
+    [ "$(date +%s)" -lt "$deadline" ] || fail "timed out waiting for scan $srid (still $status)"
+    sleep "$POLL_INTERVAL"
+  done
+}
+
+# ---------------------------------------------------------------------------
 log "resolving repository '$REPOSITORY'"
 REPO_ID="$(resolve_repository)"
 log "repository id: $REPO_ID"
-
 TOOLS="$(resolve_tools)"
 
-EXTRA=()
-if [ -n "$GIT_TOKEN_ID" ];          then EXTRA+=(--gitTokenId "$GIT_TOKEN_ID"); fi
-if [ "$CREATE_ISSUE" = "true" ];    then EXTRA+=(--createIssue=true); fi
-if [ "$AUTO_REMEDIATE" = "true" ];  then EXTRA+=(--autoRemediate=true); fi
-
-declare -a SCANS=()   # "scanResultId|toolId"
+declare -a SCANS=()
 SCAN_IDS=""
 for tool_id in $TOOLS; do
-  log "starting scan: tool='$tool_id' branch='$BRANCH'"
-  vcli "$WORK/start.json" start_repository_scan \
-    --repositoryId "$REPO_ID" --dockerScanToolId "$tool_id" --branch "$BRANCH" "${EXTRA[@]}"
-  srid="$(jq -r '.startRepositoryScan.scanResult.id // empty' "$WORK/start.json")"
-  [ -n "$srid" ] || fail "scan did not return a scan result id (tool '$tool_id')"
-  SCANS+=("$srid|$tool_id")
+  log "starting scan (tool $tool_id, branch '$BRANCH')"
+  srid="$(start_scan "$tool_id")"
+  [ -n "$srid" ] || fail "scan did not return a scan result id (tool $tool_id)"
+  SCANS+=("$srid")
   SCAN_IDS="$SCAN_IDS $srid"
   log "  scan result id: $srid"
 done
 SCAN_IDS="$(echo "$SCAN_IDS" | sed 's/^ *//')"
 
-# --- wait for all scans to finish -----------------------------------------
-terminal() { case "$(echo "$1" | tr '[:lower:]' '[:upper:]')" in SUCCESS|FAILED|CANCELLED|ERROR) return 0 ;; *) return 1 ;; esac }
-
 log "waiting for scans to finish (timeout ${WAIT_TIMEOUT}s)"
-deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
-for item in "${SCANS[@]}"; do
-  srid="${item%%|*}"; tool="${item#*|}"
-  while :; do
-    vcli "$WORK/status.json" get_scan_result --id "$srid"
-    status="$(jq -r '.scanResult.status // "PENDING"' "$WORK/status.json")"
-    if terminal "$status"; then
-      log "  '$tool' -> $status"
-      [ "$(echo "$status" | tr '[:lower:]' '[:upper:]')" = "SUCCESS" ] || fail "scan for '$tool' ended as $status"
-      break
-    fi
-    [ "$(date +%s)" -lt "$deadline" ] || fail "timed out waiting for scan '$tool' (still $status)"
-    sleep "$POLL_INTERVAL"
-  done
+for srid in "${SCANS[@]}"; do
+  wait_scan "$srid"
+  log "  $srid -> SUCCESS"
 done
 
 # --- collect findings + gate ----------------------------------------------
 HIGHEST=0; HIGHEST_NAME="none"
 declare -A SEV_TOTAL=( [CRITICAL]=0 [HIGH]=0 [MEDIUM]=0 [LOW]=0 )
-for item in "${SCANS[@]}"; do
-  srid="${item%%|*}"
-  vcli "$WORK/findings.json" scan_findings --filters "scanResultId=$srid"
-  while IFS=$'\t' read -r sev cnt; do
+for srid in "${SCANS[@]}"; do
+  data="$(gql "$(jq -n --arg id "$srid" \
+    '{query:"query($l:List){scanFindings(list:$l){items{severity}}}",variables:{l:{filters:[{field:"scanResultId",stringEquals:$id}]}}}')")"
+  while read -r sev; do
     [ -n "$sev" ] || continue
     up="$(echo "$sev" | tr '[:lower:]' '[:upper:]')"
-    case "$up" in CRITICAL|HIGH|MEDIUM|LOW) SEV_TOTAL[$up]=$(( ${SEV_TOTAL[$up]:-0} + cnt )) ;; esac
+    case "$up" in CRITICAL|HIGH|MEDIUM|LOW) SEV_TOTAL[$up]=$(( ${SEV_TOTAL[$up]:-0} + 1 )) ;; esac
     r="$(sev_rank "$up")"
     if [ "$r" -gt "$HIGHEST" ]; then HIGHEST="$r"; HIGHEST_NAME="$up"; fi
-  done < <(jq -r '.scanFindings.items[].severity' "$WORK/findings.json" 2>/dev/null \
-            | sort | uniq -c | awk '{print $2"\t"$1}')
+  done < <(echo "$data" | jq -r '.scanFindings.items[].severity')
 done
 
 TOTAL=$(( SEV_TOTAL[CRITICAL] + SEV_TOTAL[HIGH] + SEV_TOTAL[MEDIUM] + SEV_TOTAL[LOW] ))
