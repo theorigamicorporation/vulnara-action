@@ -34,6 +34,9 @@ input() {
 # --- config (overridable for non-prod) ------------------------------------
 TOKEN_URL="$(input token-url)";       [ -n "$TOKEN_URL" ]   || TOKEN_URL="https://auth.theorigamicorporation.com/application/o/token/"
 GATEWAY_URL="$(input gateway-url)";   [ -n "$GATEWAY_URL" ] || GATEWAY_URL="https://vulnara-gw.rso.dev/graphql"
+APP_URL="$(input app-url)";           [ -n "$APP_URL" ]     || APP_URL="https://vulnara.rso.dev"
+APP_URL="${APP_URL%/}"
+FINDING_LIMIT=50
 CLIENT_ID="$(input oauth-client-id)"; [ -n "$CLIENT_ID" ]   || CLIENT_ID="hl04e6MSMRY60LdpGh5rdMRQjkPxvldAYoqXdzo4"
 
 # --- inputs ---------------------------------------------------------------
@@ -256,10 +259,12 @@ done
 step 5 "Evaluate findings"
 HIGHEST=0; HIGHEST_NAME="NONE"
 declare -A SEV_TOTAL=( [CRITICAL]=0 [HIGH]=0 [MEDIUM]=0 [LOW]=0 )
-declare -a SCAN_FINDINGS=()
+declare -a SCAN_FINDINGS=() SCAN_ITEMS=()
 for srid in "${SCANS[@]}"; do
   data="$(gql "$(jq -n --arg id "$srid" \
-    '{query:"query($l:List){scanFindings(list:$l){items{severity}}}",variables:{l:{filters:[{field:"scanResultId",stringEquals:$id}]}}}')")"
+    '{query:"query($l:List){scanFindings(list:$l){items{id severity file line confidence commitScan{commitHash}}}}",variables:{l:{filters:[{field:"scanResultId",stringEquals:$id}]}}}')")"
+  items="$(echo "$data" | jq -c '.scanFindings.items // []')"
+  SCAN_ITEMS+=("$items")
   cnt=0
   while read -r sev; do
     [ -n "$sev" ] || continue
@@ -268,7 +273,7 @@ for srid in "${SCANS[@]}"; do
     case "$up" in CRITICAL|HIGH|MEDIUM|LOW) SEV_TOTAL[$up]=$(( ${SEV_TOTAL[$up]:-0} + 1 )) ;; esac
     r="$(sev_rank "$up")"
     if [ "$r" -gt "$HIGHEST" ]; then HIGHEST="$r"; HIGHEST_NAME="$up"; fi
-  done < <(echo "$data" | jq -r '.scanFindings.items[].severity')
+  done < <(echo "$items" | jq -r '.[].severity')
   SCAN_FINDINGS+=("$cnt")
 done
 
@@ -284,6 +289,16 @@ info "Medium" "${SEV_TOTAL[MEDIUM]}"
 info "Low" "${SEV_TOTAL[LOW]}"
 info "Total" "$TOTAL"
 info "Highest" "$HIGHEST_LABEL"
+for i in "${!SCANS[@]}"; do
+  info "view scan" "${SCAN_LABELS[$i]}: ${APP_URL}/repository-scans/${SCANS[$i]}"
+done
+
+# combine all findings, tagging each with its tool, for the detailed table
+ALL_ITEMS="[]"
+for i in "${!SCANS[@]}"; do
+  ALL_ITEMS="$(jq -c --argjson acc "$ALL_ITEMS" --arg tool "${SCAN_LABELS[$i]}" \
+    '$acc + (map(. + {tool:$tool}))' <<<"${SCAN_ITEMS[$i]}")"
+done
 
 # --- outputs ---------------------------------------------------------------
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -320,11 +335,40 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo ""
     echo "### Scans"
     echo ""
-    echo "| Tool | Duration | Findings | Scan result id |"
+    echo "| Tool | Duration | Findings | View in Vulnara |"
     echo "|---|---|---|---|"
     for i in "${!SCANS[@]}"; do
-      echo "| ${SCAN_LABELS[$i]} | ${SCAN_DURATIONS[$i]:-?}s | ${SCAN_FINDINGS[$i]:-0} | \`${SCANS[$i]}\` |"
+      echo "| ${SCAN_LABELS[$i]} | ${SCAN_DURATIONS[$i]:-?}s | ${SCAN_FINDINGS[$i]:-0} | [\`${SCANS[$i]:0:8}\`]($APP_URL/repository-scans/${SCANS[$i]}) |"
     done
+    if [ "$TOTAL" -gt 0 ]; then
+      echo ""
+      echo "### Detailed findings"
+      echo ""
+      shown="$(echo "$ALL_ITEMS" | jq -r '[.[] | select((.file // "") != "")] | length')"
+      echo "| Severity | Location | Tool | Confidence |"
+      echo "|---|---|---|---|"
+      echo "$ALL_ITEMS" | jq -r --arg base "$REPO_URL" --arg prov "$REPO_PROVIDER" --argjson limit "$FINDING_LIMIT" '
+        def rank(s): (s // "" | ascii_upcase) as $u
+          | if $u=="CRITICAL" then 4 elif $u=="HIGH" then 3 elif $u=="MEDIUM" then 2 elif $u=="LOW" then 1 else 0 end;
+        def sevlabel(s): (s // "" | ascii_upcase) as $u
+          | if $u=="CRITICAL" then "Critical" elif $u=="HIGH" then "High" elif $u=="MEDIUM" then "Medium" elif $u=="LOW" then "Low" else (s // "-") end;
+        def loc:
+          if (.file // "") == "" then "-"
+          else (.file + (if .line == null then "" else ":" + (.line|tostring) end)) as $txt
+            | if ($base == "") or ((.commitScan.commitHash // "") == "") then $txt
+              else ($base + (if $prov=="gitlab" then "/-/blob/" else "/blob/" end) + .commitScan.commitHash + "/" + .file + (if .line==null then "" else "#L"+(.line|tostring) end)) as $u
+                | "[`" + $txt + "`](" + $u + ")"
+              end
+          end;
+        [.[] | select((.file // "") != "")]
+        | sort_by(-rank(.severity))
+        | .[:$limit]
+        | .[] | "| " + sevlabel(.severity) + " | " + loc + " | " + (.tool // "-") + " | " + (.confidence // "-") + " |"'
+      if [ "$shown" -gt "$FINDING_LIMIT" ]; then
+        echo ""
+        echo "_Showing the top $FINDING_LIMIT of $shown located findings. Open the scans above to see all._"
+      fi
+    fi
   } >> "$GITHUB_STEP_SUMMARY"
 fi
 

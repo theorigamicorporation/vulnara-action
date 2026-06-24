@@ -50,6 +50,10 @@ inputs:
     description: 'Seconds between scan status checks.'
     required: false
     default: '15'
+  app-url:
+    description: 'Vulnara web app base URL, used to build links to scans in the platform (override for non-prod).'
+    required: false
+    default: 'https://vulnara.rso.dev'
   gateway-url:
     description: 'Vulnara GraphQL gateway URL (override for non-prod).'
     required: false

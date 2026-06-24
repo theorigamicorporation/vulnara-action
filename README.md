@@ -68,6 +68,7 @@ jobs:
 | `auto-remediate` | no | `false` | Open a fix PR (requires `create-issue`). |
 | `wait-timeout` | no | `1800` | Max seconds to wait for scans. |
 | `poll-interval` | no | `15` | Seconds between status checks. |
+| `app-url` | no | prod | Vulnara web app base URL, used for links to scans in the platform. |
 | `gateway-url` | no | prod | GraphQL gateway URL (override for non-prod). |
 | `token-url` | no | prod | OAuth token endpoint (override for non-prod). |
 | `oauth-client-id` | no | prod | OAuth client id for the token exchange. |
@@ -82,6 +83,8 @@ jobs:
 
 ## Notes
 
+- The job summary links each scan to the exact result in the Vulnara platform and
+  links every finding to the offending line in the code (at the scanned commit).
 - The job runs until the scan(s) complete (up to `wait-timeout`), so it acts as a
   real security gate. The service-account token is refreshed automatically for
   long-running scans.
