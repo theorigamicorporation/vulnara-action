@@ -124,8 +124,17 @@ resolve_repository() {
   REPO_VISIBILITY="$(echo "$item" | jq -r 'if .private == true then "private" elif .private == false then "public" else "unknown" end')"
   REPO_ENABLED="$(echo "$item" | jq -r 'if .enabled == false then "no" else "yes" end')"
   REPO_LANGS="$(echo "$item" | jq -r '(.programmingLanguage // []) | join(", ") | if . == "" then "n/a" else . end')"
-  REPO_URL="$(echo "$item" | jq -r '.gitEntity.htmlUrl // .cloneUrl // ""')"
-  [ -z "$REPO_URL" ] || REPO_URL="${REPO_URL%/}/$(echo "$item" | jq -r '.repositoryName')"
+  local entity_url clone_url rname
+  entity_url="$(echo "$item" | jq -r '.gitEntity.htmlUrl // ""')"
+  clone_url="$(echo "$item" | jq -r '.cloneUrl // ""')"
+  rname="$(echo "$item" | jq -r '.repositoryName')"
+  if [ -n "$entity_url" ]; then
+    REPO_URL="${entity_url%/}/$rname"
+  elif [ -n "$clone_url" ]; then
+    REPO_URL="${clone_url%.git}"
+  else
+    REPO_URL=""
+  fi
 }
 
 # --- resolve scan tools (by name or id); echo "id<TAB>name" per line -------
