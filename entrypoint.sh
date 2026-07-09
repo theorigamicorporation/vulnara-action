@@ -140,6 +140,20 @@ resolve_repository() {
   fi
 }
 
+# --- scanner display name (mirrors the app's scanImages.<name>.title map) ---
+scanner_display() {
+  case "$1" in
+    AEGIS|aegis) printf 'Ripley' ;;
+    pdd) printf 'Bishop' ;;
+    trivy) printf 'Hicks' ;;
+    secret_scanner) printf 'Ash' ;;
+    SECRET_SCANNER|"Secret Scanner") printf 'Secret Scanner' ;;
+    personal_data_scanner|PERSONAL_DATA_SCANNER|"Personal Data Scanner")
+      printf 'Personal Data Scanner' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 # --- resolve scan tools (by name or id); echo "id<TAB>name" per line -------
 resolve_tools() {
   local data; data="$(gql '{"query":"{dockerScanTools(list:{}){items{id name}}}"}')"
@@ -240,11 +254,12 @@ declare -a SCANS=() SCAN_LABELS=() SCAN_DURATIONS=()
 SCAN_IDS=""
 for i in "${!TOOL_IDS[@]}"; do
   tname="${TOOL_NAMES[$i]}"
+  label="$(scanner_display "$tname")"
   srid="$(start_scan "${TOOL_IDS[$i]}")"
-  [ -n "$srid" ] || fail "scan did not return a scan result id (tool '$tname')"
-  SCANS+=("$srid"); SCAN_LABELS+=("$tname")
+  [ -n "$srid" ] || fail "scan did not return a scan result id (tool '$label')"
+  SCANS+=("$srid"); SCAN_LABELS+=("$label")
   SCAN_IDS="$SCAN_IDS $srid"
-  ok "started '$tname' -> scan $srid"
+  ok "started '$label' -> scan $srid"
 done
 SCAN_IDS="$(echo "$SCAN_IDS" | sed 's/^ *//')"
 
