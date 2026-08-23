@@ -1,0 +1,40 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+context: |
+  Repo: vulnara-action, a GitHub Action (Docker container action) that runs a
+  Vulnara security scan on a branch from CI and gates the build on findings.
+
+  Tech stack: single Bash script (entrypoint.sh, set -euo pipefail) on alpine:3.20
+  with curl + jq; action.yml declares inputs/outputs; no build step, no tests, no CI.
+
+  Integrations: OAuth2 client_credentials against Authentik for the service-account
+  JWT, then the Vulnara GraphQL gateway (X-Tenant header) for repositories,
+  dockerScanTools, startRepositoryScan, scanResult status polling and scanFindings.
+
+  Conventions: GraphQL bodies built with `jq -n`; inputs read via the input() helper
+  (GitHub exposes them as INPUT_SERVICE-ACCOUNT with dashes); logs prefixed "vulnara:"
+  on stderr with ::error::/::warning:: annotations; every endpoint has a prod default
+  and a non-prod override input; conventional commit messages.
+
+  Domain: tenant/workspace, repository (must exist and be enabled in Vulnara; private
+  repos need a git-token-id), scan tool, scan result (SUCCESS/FAILED/CANCELLED),
+  finding severity CRITICAL > HIGH > MEDIUM > LOW.
