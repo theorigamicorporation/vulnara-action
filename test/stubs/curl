@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Test stub for curl. Never performs network I/O.
+#
+# Behaviour is driven by two environment variables:
+#   STUB_DIR      writable dir where the stub records requests
+#   FIXTURE_DIR   dir holding the canned JSON responses
+#
+# Responses are chosen from the request: the OAuth token endpoint gets
+# token.json, GraphQL posts are dispatched on the operation named in the
+# request body (repositories / dockerScanTools / startRepositoryScan /
+# scanResult / scanFindings). A response file may be sequenced per call as
+# <name>.1.json, <name>.2.json, ...; the unnumbered <name>.json is the
+# fallback for every further call.
+set -uo pipefail
+
+url=""
+body=""
+next_is_data=0
+declare -a headers=()
+
+for arg in "$@"; do
+  if [ "$next_is_data" -eq 1 ]; then body="$arg"; next_is_data=0; continue; fi
+  case "$arg" in
+    --data|--data-raw|--data-urlencode|-d) next_is_data=1 ;;
+    -H) next_is_data=0 ;;
+    http://*|https://*) url="$arg" ;;
+    *) headers+=("$arg") ;;
+  esac
+done
+
+# record the full invocation for assertions
+{
+  printf 'REQUEST\turl=%s\n' "$url"
+  for a in "$@"; do printf 'ARG\t%s\n' "$a"; done
+} >> "${STUB_DIR}/requests.log"
+
+pick() {
+  local name="$1" n
+  n="$(cat "${STUB_DIR}/counter.${name}" 2>/dev/null || echo 0)"
+  n=$(( n + 1 ))
+  echo "$n" > "${STUB_DIR}/counter.${name}"
+  if [ -f "${FIXTURE_DIR}/${name}.${n}.json" ]; then
+    cat "${FIXTURE_DIR}/${name}.${n}.json"
+  elif [ -f "${FIXTURE_DIR}/${name}.json" ]; then
+    cat "${FIXTURE_DIR}/${name}.json"
+  else
+    printf '{"errors":[{"message":"no fixture %s","extensions":{"code":"NO_FIXTURE"}}]}' "$name"
+  fi
+}
+
+case "$url" in
+  *"/token/"*|*"/token")
+    pick token
+    exit 0
+    ;;
+esac
+
+# GraphQL: the body carries the operation
+op="unknown"
+case "$body" in
+  *startRepositoryScan*)  op="startRepositoryScan" ;;
+  *dockerScanTools*)      op="dockerScanTools" ;;
+  *scanFindings*)         op="scanFindings" ;;
+  *"repositories("*)      op="repositories" ;;
+  *scanResult*)           op="scanResult" ;;
+esac
+# log one compact line per request so tests can assert on the body
+compact="$(printf '%s' "$body" | jq -c . 2>/dev/null || printf '%s' "$body" | tr '\n' ' ')"
+printf '%s\t%s\n' "$op" "$compact" >> "${STUB_DIR}/graphql.log"
+pick "$op"

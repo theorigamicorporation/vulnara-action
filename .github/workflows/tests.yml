@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: shell tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show tool versions
+        run: |
+          bash --version | head -1
+          jq --version
+          shellcheck --version | head -3
+
+      - name: Lint shell sources
+        run: shellcheck -S warning entrypoint.sh test/run-tests.sh test/lib/harness.sh test/stubs/* test/*_test.sh
+
+      - name: Run the test suite
+        run: ./test/run-tests.sh
+
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the action image
+        run: docker build -t vulnara-action:ci .

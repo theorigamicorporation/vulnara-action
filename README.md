@@ -92,3 +92,16 @@ jobs:
   and network findings can be added later.
 - The repository must already exist in Vulnara, be **enabled**, and have access
   to the branch (a git token for private repos).
+
+## Development
+
+Run the test suite (needs `bash` and `jq`, nothing else):
+
+```bash
+./test/run-tests.sh
+```
+
+The tests run offline against a stubbed `curl`, so no Vulnara account or network
+access is required. See [test/README.md](test/README.md) for the layout and for
+how to add a case. CI runs shellcheck, the suite, and a Docker image build on
+every push and pull request.

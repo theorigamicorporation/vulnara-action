@@ -1,0 +1,22 @@
+{
+  "data": {
+    "repositories": {
+      "items": [
+        {
+          "id": "repo-1111",
+          "repositoryName": "widgets",
+          "private": false,
+          "enabled": true,
+          "programmingLanguage": ["Go", "Shell"],
+          "cloneUrl": "https://git.example.test/acme/widgets.git",
+          "gitEntity": {
+            "__typename": "Organization",
+            "name": "acme",
+            "gitType": "github",
+            "htmlUrl": "https://git.example.test/acme"
+          }
+        }
+      ]
+    }
+  }
+}
