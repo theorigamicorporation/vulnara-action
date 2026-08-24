@@ -2,7 +2,17 @@
 
 [Back to the README](../README.md)
 
-There is no automated test suite on `main` yet. A change is verified by three things.
+```bash
+./test/run-tests.sh
+```
+
+**72 tests.** They need only `bash` and `jq`, both already in the action image. `curl` and `sleep`
+are stubbed on `PATH`, so nothing reaches the network and no Vulnara account is required. See
+[test/README.md](../test/README.md) for the layout and how to add a case.
+
+CI runs shellcheck, the suite, and a Docker image build on every push and pull request.
+
+Beyond the suite, a change is also verified by three things.
 
 ## 1. Lint
 

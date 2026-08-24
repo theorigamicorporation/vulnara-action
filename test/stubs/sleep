@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Test stub for sleep: records the requested delay and returns immediately so
+# polling loops run at full speed offline.
+printf '%s\n' "${1:-0}" >> "${STUB_DIR}/sleep.log"
+exit 0

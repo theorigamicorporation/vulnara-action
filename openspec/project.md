@@ -30,9 +30,11 @@ Dockerfile                 # alpine + bash/curl/jq, ENTRYPOINT /entrypoint.sh
 entrypoint.sh              # the entire implementation (auth, GraphQL, gate, summary)
 README.md                  # user-facing docs: prerequisites, usage, inputs, outputs
 examples/vulnara-scan.yml  # copy-paste workflow example
+test/                      # offline bash test suite (runner, harness, stubs, fixtures)
+.github/workflows/tests.yml # shellcheck + test suite + docker build on push and PR
 ```
 
-There is no test suite, no CI workflow, and no build step in this repository.
+There is no build step in this repository.
 
 ### Code Style
 
@@ -56,7 +58,14 @@ There is no test suite, no CI workflow, and no build step in this repository.
 
 ### Testing
 
-No automated tests exist today. The action is exercised end-to-end by referencing the
+`test/run-tests.sh` runs a dependency-free bash test suite (only `bash` and `jq` are
+needed); `test/run-tests.sh <file>` or `-f <substring>` narrows the run. Tests execute
+`entrypoint.sh` with stubbed `curl` and `sleep` on `PATH`, so they never reach the
+network: every API response comes from a JSON fixture under `test/fixtures/base`, which
+a test can override per scenario. Inputs are injected with `env(1)` because bash cannot
+export the dashed `INPUT_*` names. Each test carries a `# spec:` comment naming the
+requirement and scenario it covers. Fixtures must stay free of real credentials, hosts
+and tenant ids. The action is additionally exercised end-to-end by referencing the
 repository from a workflow and pointing it at a non-prod Vulnara via the `*-url` inputs.
 
 ## Domain Context
