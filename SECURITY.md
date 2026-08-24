@@ -13,6 +13,8 @@ Report it privately through GitHub:
 on this repository. GitHub private vulnerability reporting keeps the report visible
 only to the maintainers until an advisory is published.
 
+If you would rather not use GitHub, email **security@vulnara.io** instead.
+
 Please include:
 
 - the affected version or tag (`v1`, `v1.0.5`, or a commit sha)
