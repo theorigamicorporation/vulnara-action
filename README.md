@@ -132,6 +132,10 @@ before adding a second scanner.
 Outputs (`scan-result-ids`, `highest-severity`, `passed`), validation rules and the runner
 environment the action reads: [docs/configuration.md](docs/configuration.md).
 
+> **Working on this action?** It is driven by [just](https://just.systems/). Run `just` for the
+> recipe list, `just test` for the offline suite, and `just ci` for lint, tests and the image
+> build together.
+
 ## Documentation
 
 | Guide | What is in it |
