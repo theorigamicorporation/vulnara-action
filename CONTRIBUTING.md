@@ -97,6 +97,34 @@ Deeper guides live in [`docs/`](docs/): [architecture](docs/architecture.md),
 [troubleshooting](docs/troubleshooting.md), [development](docs/development.md) and
 [testing](docs/testing.md). A behaviour change usually touches one of them.
 
+### Writing a requirement
+
+`openspec validate --specs --strict` gates merges, so a malformed requirement blocks the branch.
+Two rules the validator applies that are easy to trip:
+
+- **SHALL or MUST must appear on the requirement's first line.** The validator takes only that
+  line as the requirement text, so a keyword on line two fails even though the paragraph reads
+  correctly. Lead with the obligation:
+
+  ```
+  ### Requirement: Never show a scanner's internal name
+  Scanners SHALL be shown under their product names, never under the name of the
+  image that runs them.
+  ```
+
+  not:
+
+  ```
+  ### Requirement: Never show a scanner's internal name
+  Scanners are stored under the name of the image that runs them, and SHALL be
+  shown under their product names.
+  ```
+
+- **Every requirement needs at least one `#### Scenario:`**, in WHEN/THEN form.
+
+Run `openspec validate --specs --strict` locally before pushing. `just specs` does it where a
+justfile exists.
+
 ## Checks before opening a PR
 
 ```bash
