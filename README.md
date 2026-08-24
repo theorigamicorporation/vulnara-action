@@ -4,6 +4,8 @@
   <tr><th>CI</th><th>Code</th><th>OpenSpec</th><th>Security</th></tr>
   <tr>
     <td>
+      <a href="../../actions/workflows/tests.yml"><img src="../../actions/workflows/tests.yml/badge.svg" alt="Tests"></a><br>
+      <a href="../../actions/workflows/openspec.yml"><img src="../../actions/workflows/openspec.yml/badge.svg" alt="OpenSpec Gate"></a><br>
       <a href="../../actions/workflows/openspec-badges.yml"><img src="../../actions/workflows/openspec-badges.yml/badge.svg" alt="OpenSpec Badges"></a>
     </td>
     <td>
