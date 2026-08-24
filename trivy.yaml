@@ -1,0 +1,33 @@
+# Trivy scan configuration.
+#
+# Auto-detected from the working directory, so `xxsec-scan-trivy .` and a plain
+# `trivy fs .` both pick it up with no extra flags.
+#
+# This only excludes build artefacts and installed dependency trees. It does not
+# suppress findings: Trivy reads dependency vulnerabilities from lockfiles and
+# manifests, not from the installed tree, so skipping node_modules and .venv
+# changes nothing about what is reported. Verified against vulnara-frontend,
+# where the counts are identical with and without this file.
+#
+# The reason it exists: these directories contain fixtures and cached test names
+# that match secret patterns. A pytest cache holding
+# `test_provider_tokens_are_replaced[ghp_AAAA...]` is a test name, not a leaked
+# token, and noise like that trains people to ignore the scanner.
+scan:
+  skip-dirs:
+    # Python
+    - "**/.pytest_cache"
+    - "**/.venv"
+    - "**/venv"
+    - "**/__pycache__"
+    - "**/.mypy_cache"
+    - "**/.ruff_cache"
+    # JavaScript and TypeScript
+    - "**/node_modules"
+    - "**/.next"
+    - "**/.cache"
+    - "**/public/build"
+    # Build output
+    - "**/dist"
+    - "**/build"
+    - "**/coverage"
