@@ -36,9 +36,9 @@ Verification: @docs/testing.md | Known issues: @docs/troubleshooting.md
 - Build every GraphQL body with `jq -n`. Never interpolate an input into a query string.
 - Every endpoint keeps a production default in both `action.yml` and `entrypoint.sh` plus an input
   that overrides it.
-- `resolve_tools` is consumed through a process substitution (`entrypoint.sh:248`), so a `fail()`
-  inside it kills only the subshell and the action still exits 0. Do not add a new gate check
-  inside a process substitution. See @docs/troubleshooting.md
+- Never put a gate check inside a process substitution or any other subshell: a `fail()` there
+  kills only the subshell and the action still exits 0. `resolve_tools` is captured into a
+  variable for exactly that reason. See @docs/troubleshooting.md
 - A new input lands in `action.yml`, `docs/configuration.md` and
   `openspec/specs/action-configuration/spec.md` in the same pull request.
 

@@ -2,34 +2,10 @@
 
 [Back to the README](../README.md)
 
-Three known issues in the action itself, then the failures that come from configuration or the
+Two known issues in the action itself, then the failures that come from configuration or the
 platform.
 
 ## Known issues
-
-### A tool resolution failure passes the gate
-
-The one to know about. Step 3 consumes the tool list with `done < <(resolve_tools)` at
-`entrypoint.sh:248`, so `resolve_tools` runs in the subshell of a process substitution. When it
-hits an unknown tool name it prints an `::error::` annotation and exits, but only that subshell
-dies. The parent keeps running with an empty tool list: it starts no scans, reads no findings,
-reports the highest severity as `none`, and **exits 0**. The job goes green having scanned
-nothing, and `set -euo pipefail` does not catch it because the failure is not in the parent's
-pipeline.
-
-Symptoms: an `::error::scan tool '<name>' not found` annotation on a **successful** job, and
-`vulnara:   ✓ 0 scan tool(s) selected` in the log.
-
-Until it is fixed, assert on the output in a following step:
-
-```yaml
-      - uses: theorigamicorporation/vulnara-action@v1
-        id: vulnara
-        with: { service-account: ..., token: ..., tenant: ..., scan-tools: AEGIS }
-      - name: Fail if no scan actually ran
-        if: ${{ steps.vulnara.outputs.scan-result-ids == '' }}
-        run: exit 1
-```
 
 ### The wrong repository is scanned
 
