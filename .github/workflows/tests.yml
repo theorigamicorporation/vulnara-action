@@ -2,8 +2,15 @@ name: tests
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
+
+# One run per ref. Superseded PR runs are cancelled so a shared self-hosted
+# runner set is not spent finishing work nobody is waiting for. Runs on the
+# default branch are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
