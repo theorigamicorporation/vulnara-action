@@ -1,0 +1,39 @@
+name: OpenSpec Badges
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'openspec/**'
+      - 'scripts/openspec_badges.py'
+      - '.github/workflows/openspec-badges.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  badges:
+    name: Regenerate OpenSpec badges
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate badges
+        run: python scripts/openspec_badges.py .
+
+      - name: Commit if changed
+        run: |
+          if [ -n "$(git status --porcelain docs/badges)" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/badges
+            git commit -m "docs(badges): refresh OpenSpec counts"
+            git push
+          else
+            echo "badges unchanged"
+          fi
