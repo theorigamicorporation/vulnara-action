@@ -47,6 +47,11 @@ If you change what the action does, update the affected capability in the same P
 The badge counts in the README are regenerated from `openspec/` by
 `scripts/openspec_badges.py`, which the `OpenSpec Badges` workflow runs on `main`.
 
+Deeper guides live in [`docs/`](docs/): [architecture](docs/architecture.md),
+[configuration](docs/configuration.md), [reference](docs/reference.md),
+[troubleshooting](docs/troubleshooting.md), [development](docs/development.md) and
+[testing](docs/testing.md). A behaviour change usually touches one of them.
+
 ## Checks before opening a PR
 
 ```bash
