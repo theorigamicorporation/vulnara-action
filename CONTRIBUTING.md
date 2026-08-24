@@ -24,13 +24,58 @@ Branch off `main`, one topic per branch:
 
 ## Commits
 
-Conventional commit subjects, lower case, scope optional:
+**Conventional Commits are mandatory.** They are not a style preference: release tooling parses the
+type prefix to build release notes and to decide the next semantic version, so a wrongly typed
+commit produces a wrong release.
 
 ```
-feat: add fail-on threshold for dependency findings
-fix: do not double repo name in URL when falling back to cloneUrl
-docs: document the scanner codename mapping
+<type>(<optional scope>): <description>
+
+[optional body]
+
+[optional footer]
 ```
+
+Allowed types:
+
+| Type | Use for | Version effect |
+|---|---|---|
+| `feat` | New behaviour | MINOR |
+| `fix` | Bug fix | PATCH |
+| `perf` | Performance, no behaviour change | PATCH |
+| `refactor` | Internal change, no behaviour change | none |
+| `docs` | Documentation only | none |
+| `test` | Tests only | none |
+| `build` | Build system or dependencies | none |
+| `ci` | CI configuration | none |
+| `chore` | Tooling, housekeeping | none |
+| `revert` | Reverts a previous commit | matches what it reverts |
+
+### Breaking changes
+
+A breaking change is a MAJOR bump and must be marked, either with a `!` after the type or with a
+`BREAKING CHANGE:` footer. Both forms are valid; the footer is preferred when the reason needs
+explaining.
+
+```
+feat(api)!: require X-TENANT-ID on the corroboration endpoint
+
+BREAKING CHANGE: callers that relied on the unscoped lookup must now send the tenant header.
+```
+
+### Versioning
+
+Releases follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`, bumped from the
+commit types above. MAJOR for incompatible changes, MINOR for backwards-compatible additions,
+PATCH for backwards-compatible fixes.
+
+Rules that catch people out:
+
+- One logical change per commit. A commit that both fixes a bug and adds a feature cannot be typed
+  correctly, so split it.
+- The subject is imperative and lower case, under about 72 characters, with no trailing full stop.
+- The scope is optional but should name a real module or capability when used, not a file name.
+- `revert` commits should name the reverted SHA in the body.
 
 ## The OpenSpec workflow
 
