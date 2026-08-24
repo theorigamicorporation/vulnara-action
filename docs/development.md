@@ -16,6 +16,9 @@ python3 scripts/openspec_badges.py .
 The badge script regenerates `docs/badges/*.svg` from `openspec/`. The `OpenSpec Badges`
 workflow runs it on `main` and commits the result, so run it locally only to check it is clean.
 
+All three are [just](https://just.systems/) recipes, along with the test suite. Run `just` for the
+list, or `just ci` for lint, tests and the image build in one go, which is what CI runs.
+
 ## Running against a non-production Vulnara
 
 Point a workflow at your branch and override the four environment inputs together:
