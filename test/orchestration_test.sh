@@ -251,12 +251,8 @@ test_unknown_tool_reports_the_available_list() {
   run_action
   assert_contains "$ERR" "::error::scan tool 'nosuchtool' not found." "names the unknown entry"
   assert_contains "$ERR" "Available: AEGIS, pdd, trivy, secret_scanner" "lists the available tools"
-  # KNOWN DISCREPANCY: the spec says the run fails here. resolve_tools runs in a
-  # process substitution (`done < <(resolve_tools)`), so its `fail` exits only that
-  # subshell: the annotation is emitted but the action keeps going with the tools it
-  # had already resolved and exits 0. Asserted as implemented, not as specified.
-  assert_success "the run currently continues after an unknown tool"
-  assert_eq "1" "$(graphql_count startRepositoryScan)" "only the tools resolved before the failure are scanned"
+  assert_failure "an unknown tool must fail the run"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started once a tool cannot be resolved"
 }
 
 # spec: scan-orchestration / Requirement: Resolve the requested scan tools /
@@ -265,10 +261,8 @@ test_only_separators_yields_no_scan_tools() {
   env_set "INPUT_SCAN-TOOLS" " , ,  "
   run_action
   assert_contains "$ERR" "::error::no scan tools provided" "no scan tools message"
-  # KNOWN DISCREPANCY: as above, the failure raised inside the process substitution
-  # cannot abort the parent shell, so the action reports zero tools and exits 0.
-  assert_success "the run currently continues with zero tools"
-  assert_contains "$ERR" "0 scan tool(s) selected" "no tools were selected"
+  assert_failure "an empty tool list must fail the run"
+  assert_not_contains "$ERR" "scan tool(s) selected" "the run does not report a tool count"
   assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan was started"
 }
 

@@ -241,11 +241,15 @@ ok "resolved '$REPO_FULLNAME'"
 # --- [3/5] resolve scan tools ----------------------------------------------
 step 3 "Resolve scan tools"
 declare -a TOOL_IDS=() TOOL_NAMES=()
+# resolve_tools is captured into a variable rather than consumed through a process
+# substitution: a `fail` inside `< <(...)` would only kill the subshell and let the
+# run continue with an empty tool list and exit 0.
+TOOL_LIST="$(resolve_tools)" || exit 1
 while IFS=$'\t' read -r tid tname; do
   [ -n "$tid" ] || continue
   TOOL_IDS+=("$tid"); TOOL_NAMES+=("$tname")
   info "tool" "$tname ($tid)"
-done < <(resolve_tools)
+done <<< "$TOOL_LIST"
 ok "${#TOOL_IDS[@]} scan tool(s) selected"
 
 # --- [4/5] start + wait for scans ------------------------------------------
