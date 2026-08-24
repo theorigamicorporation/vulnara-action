@@ -49,30 +49,33 @@ Verification: @docs/testing.md | Known issues: @docs/troubleshooting.md
 - Do not hand-edit `openspec/specs/` outside an archive step, or `docs/badges/*.svg`, which are
   generated.
 
+## Comments
+
+Comment sparingly, and only where the code cannot speak for itself. A comment restating what the
+line does is noise that goes stale.
+
+Write one when:
+
+- **A decision was made and the alternative looks more obvious.** Say why, so nobody "fixes" it
+  back. If the reasoning came from an incident, name it.
+- **You observed something and left it.** A known defect, a workaround, a constraint imposed by a
+  dependency. Say what is wrong and why it was not fixed here.
+- **The behaviour would surprise a careful reader.** Ordering that is load-bearing, a value that
+  looks arbitrary but is not, a subtlety in a library.
+
+Do not write one for what the code already says, to narrate a diff, or to mark authorship. Prefer a
+clearer name or a smaller function first.
+
+Keep it to a line or two. If it needs a paragraph, it belongs in `docs/`, and the comment should
+point there.
+
 ## Working agreement
 
-These four apply to every change, without exception.
-
-1. **Spec first, then tests, then code. In that order.**
-   - **Spec.** Behaviour changes go through OpenSpec: propose the change and get the spec deltas
-     right before writing anything. Never hand-edit `openspec/specs/`; that is what archiving is
-     for. The workflow is in @CONTRIBUTING.md.
-   - **Tests.** Write the tests against the agreed spec next, and watch them fail for the right
-     reason. Each test carries a `# spec:` comment naming the requirement and scenario it proves.
-   - **Code.** Only then implement, until the tests pass.
-
-   Writing the code first and backfilling a spec to match defeats the point: the spec stops being
-   a contract and becomes a description of whatever was built.
-2. **Conventional Commits are mandatory, and they drive the version.** The type prefix decides the
-   semver bump, so a mistyped commit produces a wrong release. Types, breaking-change marking and
-   the MAJOR/MINOR/PATCH rules are in @CONTRIBUTING.md.
-3. **Run the tests and the linter locally before you push.** Commands are in @docs/testing.md. CI
-   runs on a shared self-hosted runner set, so a push that only exists to see whether it compiles
-   takes capacity from everyone else. Fix it locally first.
-4. **Watch CI after you push. Do not push and walk away.** `gh run watch`, or
-   `gh pr checks <n> --watch`. If it fails, fix it or say so. A red check left behind is worse
-   than no check, because the next person cannot tell your failure from theirs.
-
-## Specs
-
-Behaviour changes go through OpenSpec: @CONTRIBUTING.md
+1. **Spec, then tests, then code.** Propose the OpenSpec change and settle the deltas before
+   writing anything; then tests, each with a `# spec:` comment naming its requirement and
+   scenario; then implement. Never hand-edit `openspec/specs/`. Workflow: @CONTRIBUTING.md
+2. **Conventional Commits are mandatory.** The type prefix drives the semver bump. Types and
+   breaking-change marking: @CONTRIBUTING.md
+3. **Run tests and lint locally before pushing.** CI is a shared self-hosted runner set.
+4. **Watch CI after pushing** (`gh run watch`, `gh pr checks <n> --watch`) and fix or report what
+   fails.
