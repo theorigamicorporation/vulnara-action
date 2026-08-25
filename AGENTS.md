@@ -84,17 +84,23 @@ point there.
    repo's `.venv`, built on the interpreter in `.python-version` — `just setup` provisions it, via
    `uv` when the system has no matching interpreter. A venv on the wrong minor does not fail
    politely: it fails as a `SyntaxError` during collection, pointing at a line that is correct.
-5. **Wait for CI to finish before calling the work done**, and check the result against the head
-   commit rather than the PR summary. `gh pr checks` and the PR page cache: both have reported
-   green here while the checks on that SHA were still `in_progress`, and work has been merged on
-   that false green more than once. The reliable form is:
+5. **Wait for CI to finish before calling the work done**, and read the result from the run's
+   jobs rather than the PR summary. Three sources disagree, in this order of reliability:
+
+   | Source | Trust |
+   |---|---|
+   | `gh pr checks` / the PR page | Caches. Has reported green while checks were still running. |
+   | `check-runs` on the head SHA | Better, but lags in *both* directions — including reporting `in_progress` for minutes after a job finished. |
+   | `actions/runs/<id>/jobs` | Authoritative: per-step status and conclusion. |
 
    ```
-   gh api repos/<owner>/<repo>/commits/$(gh pr view <n> --json headRefOid -q .headRefOid)/check-runs
+   sha=$(gh pr view <n> --json headRefOid -q .headRefOid)
+   gh api repos/<owner>/<repo>/commits/$sha/check-runs        # fast, may lag
+   gh api repos/<owner>/<repo>/actions/runs/<id>/jobs         # authoritative
    ```
 
-   A check that does not exist is not a check that passed — a path-filtered workflow can leave a PR
-   with no signal at all. If nothing ran, say so rather than reporting green.
+   A check that does not exist is not a check that passed — a path-filtered workflow can leave a
+   PR with no signal at all. If nothing ran, say so rather than reporting green.
 6. **Report what you actually observed.** If CI has not finished, say it has not finished. An
    honest "I have not seen this go green" is worth more than an optimistic summary, and every
    claim in a PR body is checkable by whoever reads it next.
