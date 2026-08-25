@@ -1,26 +1,26 @@
 # Vulnara Scan Action
 
 <table>
-  <tr><th>CI</th><th>Code</th><th>OpenSpec</th><th>Security</th></tr>
+  <tr><th>CI</th><th>Code</th><th>OpenSpec</th><th>Meta</th></tr>
   <tr>
     <td>
       <a href="../../actions/workflows/tests.yml"><img src="../../actions/workflows/tests.yml/badge.svg" alt="Tests"></a><br>
-      <a href="../../actions/workflows/openspec.yml"><img src="../../actions/workflows/openspec.yml/badge.svg" alt="OpenSpec Gate"></a><br>
-      <a href="../../actions/workflows/openspec-badges.yml"><img src="../../actions/workflows/openspec-badges.yml/badge.svg" alt="OpenSpec Badges"></a>
+      <a href="../../actions/workflows/openspec.yml"><img src="../../actions/workflows/openspec.yml/badge.svg" alt="OpenSpec Gate"></a>
     </td>
     <td>
       <a href="../../tags"><img src="https://img.shields.io/github/v/tag/theorigamicorporation/vulnara-action?label=version&color=blue" alt="Latest tag"></a><br>
       <img src="https://img.shields.io/github/languages/top/theorigamicorporation/vulnara-action" alt="Top language"><br>
-      <img src="https://img.shields.io/badge/alpine-3.20-blue.svg" alt="Base image"><br>
       <a href="../../commits/main"><img src="https://img.shields.io/github/last-commit/theorigamicorporation/vulnara-action" alt="Last commit"></a>
     </td>
     <td>
       <a href="openspec/specs/"><img src="docs/badges/specs.svg" alt="Specs"></a><br>
       <a href="openspec/specs/"><img src="docs/badges/requirements.svg" alt="Requirements"></a><br>
       <a href="openspec/specs/"><img src="docs/badges/scenarios.svg" alt="Scenarios"></a><br>
-      <a href="openspec/"><img src="docs/badges/open-changes.svg" alt="Open Changes"></a>
+      <a href="openspec/"><img src="docs/badges/open-changes.svg" alt="Open Changes"></a><br>
+      <a href="../../actions/workflows/openspec-badges.yml"><img src="../../actions/workflows/openspec-badges.yml/badge.svg" alt="OpenSpec Badges"></a>
     </td>
     <td>
+      <img src="https://img.shields.io/badge/alpine-3.20-blue.svg" alt="Base image"><br>
       <a href="LICENSE"><img src="https://img.shields.io/github/license/theorigamicorporation/vulnara-action?color=green" alt="License"></a><br>
       <a href="SECURITY.md"><img src="https://img.shields.io/badge/security-policy-blue.svg" alt="Security policy"></a><br>
       <a href="../../security/advisories"><img src="https://img.shields.io/badge/disclosure-private-blue.svg" alt="Private disclosure"></a>
