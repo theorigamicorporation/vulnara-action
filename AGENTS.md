@@ -76,6 +76,25 @@ point there.
    scenario; then implement. Never hand-edit `openspec/specs/`. Workflow: @CONTRIBUTING.md
 2. **Conventional Commits are mandatory.** The type prefix drives the semver bump. Types and
    breaking-change marking: @CONTRIBUTING.md
-3. **Run tests and lint locally before pushing.** CI is a shared self-hosted runner set.
-4. **Watch CI after pushing** (`gh run watch`, `gh pr checks <n> --watch`) and fix or report what
-   fails.
+3. **Run `just ci` before pushing.** It is the same set of gates CI runs, so a failure here is a
+   failure there, found in seconds instead of minutes. CI is a shared self-hosted runner set and
+   the queue has reached 200+ jobs; a push that could have been checked locally costs everyone.
+4. **Use the toolchain the repo pins, never the system one.** `asdf` manages Go, Node, `just`,
+   `actionlint` and `ruff` here; honour `.tool-versions` where it exists. Python comes from the
+   repo's `.venv`, built on the interpreter in `.python-version` — `just setup` provisions it, via
+   `uv` when the system has no matching interpreter. A venv on the wrong minor does not fail
+   politely: it fails as a `SyntaxError` during collection, pointing at a line that is correct.
+5. **Wait for CI to finish before calling the work done**, and check the result against the head
+   commit rather than the PR summary. `gh pr checks` and the PR page cache: both have reported
+   green here while the checks on that SHA were still `in_progress`, and work has been merged on
+   that false green more than once. The reliable form is:
+
+   ```
+   gh api repos/<owner>/<repo>/commits/$(gh pr view <n> --json headRefOid -q .headRefOid)/check-runs
+   ```
+
+   A check that does not exist is not a check that passed — a path-filtered workflow can leave a PR
+   with no signal at all. If nothing ran, say so rather than reporting green.
+6. **Report what you actually observed.** If CI has not finished, say it has not finished. An
+   honest "I have not seen this go green" is worth more than an optimistic summary, and every
+   claim in a PR body is checkable by whoever reads it next.
