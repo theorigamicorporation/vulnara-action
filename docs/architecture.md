@@ -77,13 +77,12 @@ sequenceDiagram
    `git-token-id`. See [the resolution caveat](troubleshooting.md#the-wrong-repository-is-scanned).
 3. **Resolve the scanners.** `dockerScanTools` is queried once and each entry in `scan-tools`
    is matched against a tool id or a tool name, case-insensitively. An unknown name aborts the
-   step and lists the available tools, but see
-   [the exit-0 caveat](troubleshooting.md#a-tool-resolution-failure-passes-the-gate).
+   run and lists the available tools, before any scan is started.
 4. **Start and await the scans.** One `startRepositoryScan` mutation per scanner, all fired
    before any waiting begins, then `scanResult { status }` is polled every `poll-interval`
    seconds until each reaches `SUCCESS`. `FAILED` or `CANCELLED` fails the job immediately.
    The waits are sequential and each carries its own `wait-timeout`, which is
-   [the third caveat](troubleshooting.md#a-multi-scanner-run-takes-far-longer-than-wait-timeout).
+   [the second caveat](troubleshooting.md#a-multi-scanner-run-takes-far-longer-than-wait-timeout).
 5. **Evaluate the findings.** `scanFindings` is queried per scan result, findings are counted
    per severity, the job summary is rendered, the outputs are written and the gate decides the
    exit code. See [Reference](reference.md).

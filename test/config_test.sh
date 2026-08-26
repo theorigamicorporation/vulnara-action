@@ -38,6 +38,106 @@ test_action_metadata_inputs_and_outputs() {
   assert_eq "$optional_count" "$default_count" "every optional input has a default"
 }
 
+# The interface is declared in four places that drift independently: action.yml,
+# the README table consumers read, docs/configuration.md and the spec. These
+# helpers extract each list so the tests below compare them rather than restating
+# them a fifth time.
+_action_inputs() {
+  awk '/^inputs:/{f=1;next} /^outputs:/{f=0} f && /^  [a-z0-9-]+:$/{gsub(/[ :]/,"");print}' \
+    "$REPO_DIR/action.yml"
+}
+_action_outputs() {
+  awk '/^outputs:/{f=1;next} /^runs:/{f=0} f && /^  [a-z0-9-]+:$/{gsub(/[ :]/,"");print}' \
+    "$REPO_DIR/action.yml"
+}
+# "<name> yes|no" per input, from action.yml's required: flags.
+_action_required() {
+  awk '/^inputs:/{f=1;next} /^outputs:/{f=0}
+       f && /^  [a-z0-9-]+:$/{n=$1; gsub(/:/,"",n)}
+       f && /^    required:/{print n, ($2=="true" ? "yes" : "no")}' "$REPO_DIR/action.yml"
+}
+# "<name> yes|no" per row of a Markdown input table with a Required column.
+_doc_inputs() {
+  sed -n 's/^| `\([a-z0-9-]\{1,\}\)` *| *\(yes\|no\) *|.*/\1 \2/p' "$1"
+}
+
+# spec: action-configuration / Requirement: Declare the action interface /
+#       Scenario: Required inputs are marked required
+# An input declared in action.yml that entrypoint.sh never reads is the silent
+# failure of a GitHub Action: the consumer sets it, nothing happens, no error.
+test_every_declared_input_is_read_by_the_entrypoint() {
+  local script; script="$(cat "$ENTRYPOINT")"
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$script" "\$(input $name" "entrypoint reads the $name input"
+  done <<< "$(_action_inputs)"
+}
+
+# spec: action-configuration / Requirement: Declare the action interface /
+#       Scenario: Required inputs are marked required
+test_the_entrypoint_reads_no_undeclared_input() {
+  local declared; declared="$(_action_inputs)"
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$declared" "$name" "input '$name' read by entrypoint.sh is declared in action.yml"
+  done <<< "$(grep -oE '\$\(input [a-z0-9-]+' "$ENTRYPOINT" | sed 's/.*input //' | sort -u)"
+}
+
+# spec: findings-gate-reporting / Requirement: Publish action outputs
+test_every_declared_output_is_written_to_github_output() {
+  local script; script="$(cat "$ENTRYPOINT")"
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$script" "echo \"$name=" "entrypoint writes the $name output"
+  done <<< "$(_action_outputs)"
+}
+
+# spec: action-configuration / Requirement: Declare the action interface /
+#       Scenario: Required inputs are marked required
+# CONTRIBUTING.md: action.yml, the README and the spec all enumerate the inputs,
+# and a new input has to appear in all of them.
+test_readme_documents_every_input_with_the_declared_required_flag() {
+  assert_eq "$(_action_required)" "$(_doc_inputs "$REPO_DIR/README.md")" \
+    "README input table matches action.yml (name and required flag, in order)"
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$(cat "$REPO_DIR/README.md")" "\`$name\`" "README mentions the $name output"
+  done <<< "$(_action_outputs)"
+}
+
+# spec: action-configuration / Requirement: Declare the action interface /
+#       Scenario: Required inputs are marked required
+test_configuration_doc_documents_every_input_and_output() {
+  local doc="$REPO_DIR/docs/configuration.md"
+  assert_eq "$(_action_required)" "$(_doc_inputs "$doc")" \
+    "docs/configuration.md input table matches action.yml (name and required flag, in order)"
+  local body; body="$(cat "$doc")"
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$body" "| \`$name\` |" "docs/configuration.md documents the $name output"
+  done <<< "$(_action_outputs)"
+}
+
+# spec: action-configuration / Requirement: Declare the action interface /
+#       Scenario: Required inputs are marked required
+test_the_spec_enumerates_every_input_and_output() {
+  local spec; spec="$(cat "$REPO_DIR/openspec/specs/action-configuration/spec.md")"
+  local name
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$spec" "\`$name\`" "the spec names the $name input"
+  done <<< "$(_action_inputs)"
+  while read -r name; do
+    [ -n "$name" ] || continue
+    assert_contains "$spec" "\`$name\`" "the spec names the $name output"
+  done <<< "$(_action_outputs)"
+}
+
 # spec: action-configuration / Requirement: Read dashed input environment variables /
 #       Scenario: Dashed variable is present
 test_input_reads_dashed_variable() {

@@ -6,11 +6,12 @@
 ./test/run-tests.sh
 ```
 
-**72 tests.** They need only `bash` and `jq`, both already in the action image. `curl` and `sleep`
+**78 tests.** They need only `bash` and `jq`, both already in the action image. `curl` and `sleep`
 are stubbed on `PATH`, so nothing reaches the network and no Vulnara account is required. See
 [test/README.md](../test/README.md) for the layout and how to add a case.
 
-CI runs shellcheck, the suite, and a Docker image build on every push and pull request.
+CI runs shellcheck, the suite, and a Docker image build on every push and pull request, and
+`openspec validate --specs --strict` gates the merge in a second workflow.
 
 Beyond the suite, a change is also verified by three things.
 
@@ -44,15 +45,15 @@ Point a workflow at your branch and override the environment, as described in
 | Findings below `fail-on` | Job passes, summary lists the findings |
 | Findings at or above `fail-on` | Job fails with `scan gate failed`, `passed=false` |
 | Two scanners at once | Two scan ids in `scan-result-ids`, two rows in the summary |
-| An unknown tool name | See the [exit-0 caveat](troubleshooting.md#a-tool-resolution-failure-passes-the-gate); today the job passes, which is the bug |
+| An unknown tool name | Job fails with `scan tool '<name>' not found.` and the available list, before any scan starts |
 
 ## What a test has to satisfy
 
 The behaviour is written down in [`openspec/specs/`](../openspec/specs/): 43 scenarios across
 15 requirements in three capabilities, each phrased as WHEN/THEN against observable output,
-including the exact strings the action prints. When an automated suite lands, each test should
-carry a `# spec:` comment naming the capability, requirement and scenario it covers, so a
-failing test points straight at the requirement it breaks.
+including the exact strings the action prints. Each test carries a `# spec:` comment naming the
+capability, requirement and scenario it covers, so a failing test points straight at the
+requirement it breaks.
 
 Anything that stands in for the platform must stay free of real credentials, hostnames and
 tenant ids. This repository is public: use `example.test` hostnames and obviously fake ids.

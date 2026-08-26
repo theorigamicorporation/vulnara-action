@@ -20,12 +20,13 @@ Verification: @docs/testing.md | Known issues: @docs/troubleshooting.md
 
 ## Working here
 
-- There is no build step. Local checks are `shellcheck -S warning entrypoint.sh` and
-  `docker build -t vulnara-action:dev .`. Both must be clean before review.
-- An offline bash test suite under `test/` lands with the open `test/openspec-coverage` branch.
-  It stubs `curl` and `sleep` on `PATH` so nothing reaches the network, and injects inputs with
-  `env(1)` because GitHub passes them as dashed `INPUT_SERVICE-ACCOUNT` names that Bash cannot
-  export. Work on that branch, and read its `test/README.md`, rather than starting a second suite.
+- There is no build step. The local gate is `just ci`: `shellcheck -S warning` over the action
+  and the test sources, the offline test suite, and `docker build -t vulnara-action:dev .`. All
+  three must be clean before review.
+- The offline bash test suite lives under `test/` on `main`. It stubs `curl` and `sleep` on
+  `PATH` so nothing reaches the network, and injects inputs with `env(1)` because GitHub passes
+  them as dashed `INPUT_SERVICE-ACCOUNT` names that Bash cannot export. Extend it, and read
+  `test/README.md` first, rather than starting a second suite.
 - The action ships by tag. A merge to `main` changes nothing for consumers until the `v1` major
   tag moves.
 
