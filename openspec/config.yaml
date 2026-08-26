@@ -23,7 +23,7 @@ context: |
   Repo: vulnara-action, a GitHub Action (Docker container action) that runs a
   Vulnara security scan on a branch from CI and gates the build on findings.
 
-  Tech stack: single Bash script (entrypoint.sh, set -euo pipefail) on alpine:3.20
+  Tech stack: single Bash script (entrypoint.sh, set -euo pipefail) on alpine:3.24
   with curl + jq; action.yml declares inputs/outputs; no build step, no tests, no CI.
 
   Integrations: OAuth2 client_credentials against Authentik for the service-account

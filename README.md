@@ -20,7 +20,7 @@
       <a href="../../actions/workflows/openspec-badges.yml"><img src="../../actions/workflows/openspec-badges.yml/badge.svg" alt="OpenSpec Badges"></a>
     </td>
     <td>
-      <img src="https://img.shields.io/badge/alpine-3.20-blue.svg" alt="Base image"><br>
+      <img src="https://img.shields.io/badge/alpine-3.24-blue.svg" alt="Base image"><br>
       <a href="LICENSE"><img src="https://img.shields.io/github/license/theorigamicorporation/vulnara-action?color=green" alt="License"></a><br>
       <a href="SECURITY.md"><img src="https://img.shields.io/badge/security-policy-blue.svg" alt="Security policy"></a><br>
       <a href="../../security/advisories"><img src="https://img.shields.io/badge/disclosure-private-blue.svg" alt="Private disclosure"></a>

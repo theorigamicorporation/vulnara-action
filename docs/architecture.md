@@ -29,7 +29,7 @@ The web app is never called. `app-url` is used only to build links in the job su
 | Piece | Where it runs | What it does |
 |---|---|---|
 | `action.yml` | GitHub | Declares the inputs, outputs and the Docker runner |
-| `Dockerfile` | GitHub runner | `alpine:3.20` plus `bash`, `curl`, `jq`, `tar`, `ca-certificates` |
+| `Dockerfile` | GitHub runner | `alpine:3.24` plus `bash`, `curl`, `jq`, `tar`, `ca-certificates` |
 | `entrypoint.sh` | GitHub runner | The whole implementation: auth, GraphQL, polling, gate, summary |
 | Vulnara gateway | Vulnara | The only API this action calls. Owns authentication and tenancy |
 | Vulnara scanners | Vulnara | Clone the branch and produce the findings |

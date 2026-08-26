@@ -12,7 +12,7 @@ renders a GitHub job summary, and gates the build.
 ## Tech Stack
 
 - **Runtime**: Docker container action (`runs.using: docker`, `image: Dockerfile`).
-- **Base image**: `alpine:3.20` with `bash`, `curl`, `jq`, `tar`, `ca-certificates`.
+- **Base image**: `alpine:3.24` with `bash`, `curl`, `jq`, `tar`, `ca-certificates`.
 - **Implementation language**: a single Bash script, `entrypoint.sh` (`set -euo pipefail`).
 - **Remote API**: Vulnara GraphQL gateway (default `https://vulnara-gw.rso.dev/graphql`),
   called with `curl` and parsed with `jq`. No SDK, no compiled binaries, no package manager.
