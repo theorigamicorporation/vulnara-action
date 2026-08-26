@@ -39,3 +39,94 @@ jobs:
       - name: Validate changes
         continue-on-error: true
         run: openspec validate --changes --strict --no-interactive
+
+
+  # A change whose tasks are all complete on the default branch has shipped, and
+  # the only step left for it is the archive that folds its deltas into
+  # openspec/specs/. Skipping that step leaves openspec/specs/ describing
+  # behaviour the code no longer has, which is silent: nothing else in CI reads
+  # the change directory, and tests have been written against requirements that
+  # only ever existed in an unmerged delta.
+  archived:
+    name: Completed changes are archived
+    # Pull requests only. The rule is about the state of the default branch, and
+    # a red default branch would report the same backlog to everyone at once
+    # without giving anybody a diff to fix it in.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # The base commit has to be readable: completion is judged there, not
+          # on the branch.
+          fetch-depth: 0
+
+      - name: Check for completed changes left unarchived
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Changes that were already complete on the base commit. Judging
+          # completion there rather than on the branch is what keeps this off a
+          # pull request that proposes a new change, and off the one that ticks
+          # the last task: neither is complete on the default branch yet, and
+          # the archive step runs only once the implementation is merged.
+          base_changes=$(git ls-tree -r --name-only "$BASE_SHA" -- openspec/changes/ \
+            | sed -n 's#^openspec/changes/\([^/]*\)/.*#\1#p' \
+            | grep -vx 'archive' | sort -u || true)
+
+          violations=""
+          for change in $base_changes; do
+            tasks=$(git show "$BASE_SHA:openspec/changes/$change/tasks.md" 2>/dev/null) || continue
+            open=$(printf '%s\n' "$tasks" | grep -c '^[[:space:]]*-[[:space:]]*\[[[:space:]]\]' || true)
+            closed=$(printf '%s\n' "$tasks" | grep -c '^[[:space:]]*-[[:space:]]*\[[xX]\]' || true)
+
+            # An open change is the normal state of work in flight and is not
+            # what this checks. A change with no task list at all is neither.
+            if [ "$open" -ne 0 ] || [ "$closed" -eq 0 ]; then
+              continue
+            fi
+
+            dir="openspec/changes/$change"
+
+            # Archived or withdrawn on this branch: that is the fix landing.
+            if [ ! -d "$dir" ]; then
+              echo "resolved on this branch: $change"
+              continue
+            fi
+
+            # A task reopened on the branch means the work resumed, so the
+            # change is active again and is not waiting on an archive.
+            if grep -q '^[[:space:]]*-[[:space:]]*\[[[:space:]]\]' "$dir/tasks.md" 2>/dev/null; then
+              echo "reopened on this branch: $change"
+              continue
+            fi
+
+            # The escape hatch. Some completed changes genuinely cannot be
+            # archived yet because something outside this repository has to
+            # happen first: a deploy, a live-cluster verification, a sibling
+            # service serving the endpoint. Those record the blocker in
+            # PARKED.md rather than reopening a task that is actually done.
+            if [ -f "$dir/PARKED.md" ]; then
+              echo "parked: $change - $(sed -n '/[^[:space:]]/{p;q;}' "$dir/PARKED.md")"
+              continue
+            fi
+
+            echo "UNARCHIVED: $change ($closed tasks, all complete)"
+            violations="$violations $change"
+          done
+
+          if [ -n "$violations" ]; then
+            echo
+            echo "These changes are complete on the default branch but are still in"
+            echo "openspec/changes/, so openspec/specs/ does not describe what the code does:"
+            for change in $violations; do echo "  - $change"; done
+            echo
+            echo "Archive each one with 'openspec archive <change> -y', or, if it is"
+            echo "waiting on something outside this repository, add"
+            echo "openspec/changes/<change>/PARKED.md saying what it waits on."
+            exit 1
+          fi
+
+          echo "No completed change is waiting to be archived."
