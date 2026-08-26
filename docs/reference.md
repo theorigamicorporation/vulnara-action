@@ -42,8 +42,8 @@ Three limits worth knowing:
 - The gate reads `scanFindings` only, which are code and secret findings. Dependency and
   network findings are not consulted, so they cannot fail the build today.
 - A scan ending `FAILED` or `CANCELLED` fails the job on its own, before any findings are read.
-- A tool-resolution failure does **not** fail the job. See
-  [Troubleshooting](troubleshooting.md#a-tool-resolution-failure-passes-the-gate).
+- A tool-resolution failure aborts the run before any scan is started, so a name typo fails the
+  job rather than passing it with nothing scanned.
 
 ## Scanners
 

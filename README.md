@@ -145,14 +145,15 @@ environment the action reads: [docs/configuration.md](docs/configuration.md).
 | [Architecture](docs/architecture.md) | Diagrams, components, the five-step flow, the request shape |
 | [Configuration](docs/configuration.md) | Every input, output, validation rule and environment variable |
 | [Reference](docs/reference.md) | The severity gate, the scanner codenames, the job summary contract |
-| [Troubleshooting](docs/troubleshooting.md) | Three known issues, then the common failures |
+| [Troubleshooting](docs/troubleshooting.md) | Two known issues, then the common failures |
 | [Development](docs/development.md) | Local checks, non-prod runs, conventions, releasing |
-| [Testing](docs/testing.md) | What is verified today and what the specs require |
+| [Testing](docs/testing.md) | The offline suite, the lint and build gates, the end-to-end cases |
 | [Specifications](openspec/specs/) | The normative behaviour: 3 capabilities, 15 requirements, 43 scenarios |
 
-Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build: a tool-resolution
-failure currently annotates an error and then exits `0`, so the gate passes without a scan
-having run.
+Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. Two known issues
+remain: repository resolution falls back to the first result when no owner matches, so a
+same-named repository under another owner can be scanned instead, and `wait-timeout` bounds each
+scan rather than the run.
 
 ## Related repositories
 
