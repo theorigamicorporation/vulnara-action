@@ -2,7 +2,7 @@
 
 `vulnara-action` is a Docker container action implemented as a single Bash script.
 There is no build step and no package manager: everything runs from `entrypoint.sh`
-on `alpine:3.20` with `bash`, `curl` and `jq`.
+on `alpine:3.24` with `bash`, `curl` and `jq`.
 
 ## Requirements
 
