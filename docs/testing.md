@@ -18,10 +18,10 @@ Beyond the suite, a change is also verified by three things.
 ## 1. Lint
 
 ```bash
-shellcheck -S warning entrypoint.sh
+shellcheck -S warning entrypoint.sh test/run-tests.sh test/lib/harness.sh test/stubs/* test/*_test.sh
 ```
 
-Must be clean. `entrypoint.sh` runs under `set -euo pipefail`, and most of what shellcheck
+That is the source list `tests.yml` passes, and `just lint` runs it. Must be clean. `entrypoint.sh` runs under `set -euo pipefail`, and most of what shellcheck
 catches here (unquoted expansions, masked return values) is exactly the class of bug that turns
 a gate failure into a silent pass.
 

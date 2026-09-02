@@ -77,14 +77,14 @@ point there.
    scenario; then implement. Never hand-edit `openspec/specs/`. Workflow: @CONTRIBUTING.md
 2. **Conventional Commits are mandatory.** The type prefix drives the semver bump. Types and
    breaking-change marking: @CONTRIBUTING.md
-3. **Run `just ci` before pushing.** It is the same set of gates CI runs, so a failure here is a
-   failure there, found in seconds instead of minutes. CI is a shared self-hosted runner set and
-   the queue has reached 200+ jobs; a push that could have been checked locally costs everyone.
-4. **Use the toolchain the repo pins, never the system one.** `asdf` manages Go, Node, `just`,
-   `actionlint` and `ruff` here; honour `.tool-versions` where it exists. Python comes from the
-   repo's `.venv`, built on the interpreter in `.python-version` — `just setup` provisions it, via
-   `uv` when the system has no matching interpreter. A venv on the wrong minor does not fail
-   politely: it fails as a `SyntaxError` during collection, pointing at a line that is correct.
+3. **Run `just ci` before pushing.** It covers `tests.yml`, which is lint, the suite and the
+   image build, so a failure here is a failure there, found in seconds instead of minutes. It
+   does **not** cover `openspec.yml`, which also blocks a merge: run `just specs` as well. Every
+   workflow here runs on `ubuntu-latest`, not a self-hosted runner set.
+4. **Use the tools the repository names, never a substitute.** There is nothing to pin and
+   nothing to provision here: `just setup` only reports whether `bash`, `jq`, `shellcheck` and
+   `docker` are present, and `scripts/openspec_badges.py` runs on the system `python3`. This
+   repository has no `.tool-versions`, no `.python-version` and no `.venv`.
 5. **Wait for CI to finish before calling the work done**, and read the result from the run's
    jobs rather than the PR summary. Three sources disagree, in this order of reliability:
 

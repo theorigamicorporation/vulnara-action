@@ -9,6 +9,7 @@ on `alpine:3.24` with `bash`, `curl` and `jq`.
 - `bash` 4+ and `jq` for local work
 - `docker` if you want to build the action image
 - `shellcheck` for linting
+- [`just`](https://just.systems/) to run the gates as CI runs them (`just` lists every recipe)
 
 ## Branches
 
@@ -128,9 +129,18 @@ justfile exists.
 ## Checks before opening a PR
 
 ```bash
-shellcheck -S warning entrypoint.sh
+just ci      # shellcheck, the offline test suite and the image build, as tests.yml runs them
+just specs   # openspec validate --specs --strict, as openspec.yml runs it
+```
+
+`just ci` matters over running the pieces by hand because CI shellchecks the test sources too,
+not just `entrypoint.sh`:
+
+```bash
+shellcheck -S warning entrypoint.sh test/run-tests.sh test/lib/harness.sh test/stubs/* test/*_test.sh
+./test/run-tests.sh
 docker build -t vulnara-action:dev .
-python3 scripts/openspec_badges.py .
+python3 scripts/openspec_badges.py .   # only to check it produces no diff; CI commits on main
 ```
 
 ## Anything user-visible
