@@ -8,16 +8,24 @@ There is no build step and no package manager. `entrypoint.sh` is the whole impl
 ## Local checks
 
 ```bash
-shellcheck -S warning entrypoint.sh
-docker build -t vulnara-action:dev .
-python3 scripts/openspec_badges.py .
+just ci      # shellcheck, the offline test suite and the image build, as tests.yml runs them
+just specs   # openspec validate --specs --strict, as openspec.yml runs it
+just badges  # python3 scripts/openspec_badges.py .
 ```
 
 The badge script regenerates `docs/badges/*.svg` from `openspec/`. The `OpenSpec Badges`
 workflow runs it on `main` and commits the result, so run it locally only to check it is clean.
 
-All three are [just](https://just.systems/) recipes, along with the test suite. Run `just` for the
-list, or `just ci` for lint, tests and the image build in one go, which is what CI runs.
+Run `just` for the full recipe list. The pieces `just ci` runs, if you want them one at a time:
+
+```bash
+shellcheck -S warning entrypoint.sh test/run-tests.sh test/lib/harness.sh test/stubs/* test/*_test.sh
+./test/run-tests.sh
+docker build -t vulnara-action:dev .
+```
+
+`tests.yml` lints the test sources as well as `entrypoint.sh`, so `shellcheck entrypoint.sh`
+alone can be clean while CI is red.
 
 ## Running against a non-production Vulnara
 
