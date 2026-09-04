@@ -14,13 +14,32 @@ non-production Vulnara.
 
 ```mermaid
 flowchart LR
-    WF["GitHub workflow"] -->|"uses:"| ACT["vulnara-action<br/>entrypoint.sh"]
-    ACT -->|"OAuth2 client_credentials"| IDP["Vulnara identity provider<br/>(token-url)"]
-    ACT -->|"GraphQL over HTTPS"| GW["vulnara-gateway-api<br/>(gateway-url)"]
-    GW --> SCAN["Vulnara scanners"]
+    WF["GitHub workflow"]
+    ACT["vulnara-action<br/>entrypoint.sh"]
+    IDP["Vulnara identity provider<br/>token-url"]
+    GW["vulnara-gateway-api<br/>gateway-url"]
+    SCAN["Vulnara scanners"]
+    APP["Vulnara web app<br/>app-url"]
+
+    WF -->|"uses:"| ACT
+    ACT -->|"OAuth2 client_credentials"| IDP
+    ACT -->|"GraphQL over HTTPS"| GW
+    GW --> SCAN
     ACT -->|"outputs + job summary"| WF
-    ACT -.->|"links only"| APP["Vulnara web app<br/>(app-url)"]
+    ACT -.->|"links only, never called"| APP
+
+    classDef svc fill:#1f6feb,stroke:#388bfd,color:#ffffff
+    classDef db fill:#8250df,stroke:#a371f7,color:#ffffff
+    classDef mq fill:#bf8700,stroke:#d29922,color:#ffffff
+    classDef ext fill:#656c76,stroke:#8b949e,color:#ffffff
+    classDef self fill:#1a7f37,stroke:#2da44e,color:#ffffff
+
+    class WF ext
+    class ACT self
+    class IDP,GW,SCAN,APP svc
 ```
+
+<sub>Caption: the two hosts the action contacts, and the one it only links to.</sub>
 
 The web app is never called. `app-url` is used only to build links in the job summary.
 
