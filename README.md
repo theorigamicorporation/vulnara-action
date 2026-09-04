@@ -64,12 +64,44 @@ called; `app-url` only builds links in the job summary.
 
 ```mermaid
 flowchart LR
-    WF["GitHub workflow"] -->|"uses:"| ACT["vulnara-action<br/>entrypoint.sh"]
-    ACT -->|"OAuth2 client_credentials"| IDP["Vulnara identity provider<br/>(token-url)"]
-    ACT -->|"GraphQL over HTTPS"| GW["vulnara-gateway-api<br/>(gateway-url)"]
-    GW --> SCAN["Vulnara scanners"]
-    ACT -->|"outputs + job summary"| WF
+    WF["Your workflow step<br/>uses: vulnara-action@v1"]
+    IN["with:<br/>4 required, 12 optional"]
+    ACT["entrypoint.sh<br/>bash, curl, jq"]
+    IDP["identity provider<br/>token-url"]
+    GW["vulnara-gateway-api<br/>gateway-url"]
+    SCAN["Vulnara scanners"]
+    OUT["GITHUB_OUTPUT<br/>scan-result-ids<br/>highest-severity<br/>passed"]
+    SUM["GITHUB_STEP_SUMMARY<br/>findings tables"]
+    PASS["exit 0<br/>your next step runs"]
+    FAIL["exit 1<br/>your job fails"]
+
+    WF --> IN
+    IN --> ACT
+    ACT -->|"client_credentials"| IDP
+    IDP -->|"JWT"| ACT
+    ACT -->|"GraphQL, Bearer + X-Tenant"| GW
+    GW --> SCAN
+    SCAN -->|"findings"| GW
+    GW --> ACT
+    ACT --> OUT
+    ACT --> SUM
+    OUT --> WF
+    ACT -->|"highest &lt; fail-on"| PASS
+    ACT -->|"highest &gt;= fail-on"| FAIL
+
+    classDef svc fill:#1f6feb,stroke:#388bfd,color:#ffffff
+    classDef db fill:#8250df,stroke:#a371f7,color:#ffffff
+    classDef mq fill:#bf8700,stroke:#d29922,color:#ffffff
+    classDef ext fill:#656c76,stroke:#8b949e,color:#ffffff
+    classDef self fill:#1a7f37,stroke:#2da44e,color:#ffffff
+
+    class WF,IN,OUT,SUM,PASS,FAIL ext
+    class ACT self
+    class IDP,GW,SCAN svc
 ```
+
+<sub>Grey is your CI: the step, what you pass it, and what it hands back. Green is this
+repository. Blue is the Vulnara platform.</sub>
 
 Sequence diagram and internals: [docs/architecture.md](docs/architecture.md).
 
