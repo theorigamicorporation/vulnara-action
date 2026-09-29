@@ -312,7 +312,7 @@ test_sev_label_renders_display_names() {
   assert_eq "none"     "$(prelude_call sev_label INFO)"     "unknown severity"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools
+# spec: scan-orchestration / Requirement: Never print a scanner's stored name
 test_scanner_display_maps_internal_names_to_codenames() {
   assert_eq "Ripley" "$(prelude_call scanner_display AEGIS)"          "AEGIS -> Ripley"
   assert_eq "Ripley" "$(prelude_call scanner_display aegis)"          "aegis -> Ripley"
@@ -321,5 +321,11 @@ test_scanner_display_maps_internal_names_to_codenames() {
   assert_eq "Ash"    "$(prelude_call scanner_display secret_scanner)" "secret_scanner -> Ash"
   assert_eq "Secret Scanner" "$(prelude_call scanner_display SECRET_SCANNER)" "SECRET_SCANNER passthrough"
   assert_eq "Personal Data Scanner" "$(prelude_call scanner_display personal_data_scanner)" "personal data scanner"
-  assert_eq "custom-tool" "$(prelude_call scanner_display custom-tool)" "unmapped name used raw"
+}
+
+# spec: scan-orchestration / Requirement: Never print a scanner's stored name /
+#       Scenario: A scanner the mapping does not cover
+test_scanner_display_fails_closed_on_an_unmapped_name() {
+  assert_eq "Unknown scanner" "$(prelude_call scanner_display custom-tool)" "unmapped name"
+  assert_eq "Unknown scanner" "$(prelude_call scanner_display AEGIS_v2)"    "a scanner added upstream"
 }

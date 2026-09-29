@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md)
 
-What the action decides and what it prints: the severity gate, the scanner codenames, and the
+What the action decides and what it prints: the severity gate, how scanners are named, and the
 job summary it appends.
 
 ## The severity gate
@@ -49,29 +49,25 @@ Three limits worth knowing:
 
 `scan-tools` accepts either the tool id or the tool name from Vulnara's `dockerScanTools`.
 Name matching is case-insensitive; id matching is exact. Comma-separate for several, and
-surrounding whitespace is trimmed.
+surrounding whitespace is trimmed. The ids are listed against each scanner in the Vulnara
+application, and are the better thing to pass: they are stable, and they keep an internal name
+out of a workflow file that is often public.
 
-In the log and the job summary the action prints the platform codename rather than the
-internal tool name, mirroring the titles the web app uses:
+Nothing the action prints uses the stored tool name. The console log, the job summary and every
+annotation name a scanner by its product name, resolved through a single mapping in
+`entrypoint.sh`. A stored name that mapping does not cover is reported as `Unknown scanner`, not
+as itself: the fallback fails closed, so a scanner added to the platform cannot leak its name
+into a consumer's CI log on the first run after it is added, which is exactly when nobody is
+looking. `Unknown scanner` in a summary row means this action is missing a mapping, not that you
+requested something strange.
 
-| Tool name | Displayed as |
-|---|---|
-| `AEGIS`, `aegis` | Ripley |
-| `pdd` | Bishop |
-| `trivy` | Hicks |
-| `secret_scanner` | Ash |
-| `SECRET_SCANNER`, `Secret Scanner` | Secret Scanner |
-| `personal_data_scanner`, `PERSONAL_DATA_SCANNER`, `Personal Data Scanner` | Personal Data Scanner |
-| anything else | the name unchanged |
-
-Note that the lower-case `secret_scanner` maps to `Ash`, while the upper-case and spaced
-spellings pass through as `Secret Scanner`. The codename is display only: `scan-tools` still
-takes the tool name or id, never the codename.
-
-An unknown name lists what is available:
+An entry matching no id and no name aborts the run before any scan starts. The failure names
+what you passed and where to look the right value up, and deliberately does not list the
+scanners that would have worked — a CI log is world-readable on a public repository, and a typo
+should not hand a reader the roster:
 
 ```
-scan tool 'nosuchtool' not found. Available: AEGIS, pdd, trivy, secret_scanner
+scan tool 'nosuchtool' is not available to tenant 'acme'. Open https://vulnara.rso.dev to see the scanners this workspace can run, and pass the id shown there.
 ```
 
 ## The job summary
@@ -82,7 +78,7 @@ When `GITHUB_STEP_SUMMARY` is set, the action appends, in order:
    returned a URL), provider and visibility, branch, languages, the gate setting, the highest
    severity and the run duration.
 2. The per-severity counts and the total.
-3. One row per scan: codename, duration, finding count, and a link to the scan at
+3. One row per scan: the scanner's product name, duration, finding count, and a link to the scan at
    `<app-url>/repository-scans/<id>`.
 4. A detailed findings table, only when the total is above zero.
 

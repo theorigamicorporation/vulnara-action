@@ -261,10 +261,12 @@ test_tools_resolved_by_name_and_by_id() {
   env_set "INPUT_SCAN-TOOLS" "aegis, 22222222-3333-4444-5555-666666666666"
   run_action
   assert_success
-  assert_info "tool" "AEGIS (11111111-2222-3333-4444-555555555555)" "name match is case-insensitive"
-  assert_info "tool" "pdd (22222222-3333-4444-5555-666666666666)" "id match"
+  assert_info "tool" "Ripley (11111111-2222-3333-4444-555555555555)" "name match is case-insensitive"
+  assert_info "tool" "Bishop (22222222-3333-4444-5555-666666666666)" "id match"
   assert_contains "$ERR" "2 scan tool(s) selected" "tool count reported"
   assert_eq "2" "$(graphql_count startRepositoryScan)" "one scan per tool"
+  assert_not_contains "$ERR" "AEGIS" "the stored name of a resolved tool is never logged"
+  assert_not_contains "$ERR" "pdd" "the stored name of a tool resolved by id is never logged"
 }
 
 # spec: scan-orchestration / Requirement: Resolve the requested scan tools
@@ -272,19 +274,53 @@ test_tool_entries_are_trimmed() {
   env_set "INPUT_SCAN-TOOLS" "   trivy   "
   run_action
   assert_success
-  assert_info "tool" "trivy (33333333-4444-5555-6666-777777777777)" "surrounding whitespace trimmed"
+  assert_info "tool" "Hicks (33333333-4444-5555-6666-777777777777)" "surrounding whitespace trimmed"
   assert_contains "$ERR" "started 'Hicks'" "display codename used for the scan"
+  assert_not_contains "$ERR" "trivy" "the stored name is not echoed back"
 }
 
 # spec: scan-orchestration / Requirement: Resolve the requested scan tools /
 #       Scenario: Unknown tool requested
-test_unknown_tool_reports_the_available_list() {
+test_unknown_tool_names_the_entry_not_the_roster() {
   env_set "INPUT_SCAN-TOOLS" "AEGIS,nosuchtool"
   run_action
-  assert_contains "$ERR" "::error::scan tool 'nosuchtool' not found." "names the unknown entry"
-  assert_contains "$ERR" "Available: AEGIS, pdd, trivy, secret_scanner" "lists the available tools"
+  assert_contains "$ERR" "::error::scan tool 'nosuchtool' is not available to tenant 'tenant-abc'." \
+    "names the rejected entry and the tenant"
+  assert_contains "$ERR" "https://app.example.test" "points at the Vulnara application"
   assert_failure "an unknown tool must fail the run"
   assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started once a tool cannot be resolved"
+}
+
+# spec: scan-orchestration / Requirement: Never print a scanner's stored name /
+#       Scenario: A scanner is named in the log or the summary
+test_unknown_tool_failure_leaks_no_scanner_name() {
+  env_set "INPUT_SCAN-TOOLS" "nosuchtool"
+  run_action
+  assert_failure "an unknown tool must fail the run"
+  for stored in pdd trivy secret_scanner; do
+    assert_not_contains "$ERR" "$stored" "the failure must not enumerate '$stored'"
+  done
+  assert_not_contains "$ERR" "Available:" "no roster is printed"
+}
+
+# spec: scan-orchestration / Requirement: Never print a scanner's stored name /
+#       Scenario: A scanner the mapping does not cover
+test_unmapped_scanner_is_reported_as_unknown() {
+  env_set "INPUT_SCAN-TOOLS" "beyond-the-map"
+  export GITHUB_STEP_SUMMARY="$WORKDIR/summary.md"
+  : > "$GITHUB_STEP_SUMMARY"
+  env_set "GITHUB_STEP_SUMMARY" "$GITHUB_STEP_SUMMARY"
+  fixture dockerScanTools.json <<'J'
+{"data":{"dockerScanTools":{"items":[
+  {"id": "99999999-0000-1111-2222-333333333333", "name": "beyond-the-map"}
+]}}}
+J
+  run_action
+  assert_success
+  assert_info "tool" "Unknown scanner (99999999-0000-1111-2222-333333333333)" "unmapped tool shown as unknown"
+  assert_contains "$ERR" "started 'Unknown scanner'" "the scan is logged under the placeholder"
+  assert_not_contains "$ERR" "beyond-the-map" "the stored name reaches no log line"
+  assert_not_contains "$(summary)" "beyond-the-map" "the stored name reaches no summary row"
 }
 
 # spec: scan-orchestration / Requirement: Resolve the requested scan tools /

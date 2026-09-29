@@ -16,7 +16,7 @@ inputs:
     description: 'Vulnara tenant (workspace) id the service account belongs to.'
     required: true
   scan-tools:
-    description: 'Comma-separated scan tool names or ids to run (e.g. "AEGIS,pdd").'
+    description: 'Comma-separated scan tool ids (or names) to run, as listed against each scanner in Vulnara.'
     required: true
   branch:
     description: 'Branch to scan. Defaults to the branch that triggered the workflow.'

@@ -143,6 +143,11 @@ resolve_repository() {
 }
 
 # --- scanner display name (mirrors the app's scanImages.<name>.title map) ---
+# The fallback is deliberately not the stored name. Falling back to it is how a
+# scanner added to the platform leaks its image name into every consumer's CI
+# log on the first run after it is added, which is exactly when nobody is
+# looking. "Unknown scanner" is visibly wrong and gets fixed. The web app's
+# scannerLabel.ts fails closed for the same reason.
 scanner_display() {
   case "$1" in
     AEGIS|aegis) printf 'Ripley' ;;
@@ -152,11 +157,15 @@ scanner_display() {
     SECRET_SCANNER|"Secret Scanner") printf 'Secret Scanner' ;;
     personal_data_scanner|PERSONAL_DATA_SCANNER|"Personal Data Scanner")
       printf 'Personal Data Scanner' ;;
-    *) printf '%s' "$1" ;;
+    *) printf 'Unknown scanner' ;;
   esac
 }
 
-# --- resolve scan tools (by name or id); echo "id<TAB>name" per line -------
+# --- resolve scan tools (by name or id); echo "id<TAB>display name" per line -
+# The stored name never leaves this function: it is mapped here so no caller
+# holds one to print. The failure names what the caller asked for and not what
+# the platform offers - a CI log is world-readable on a public repository, and a
+# typo should not hand a reader the roster.
 resolve_tools() {
   local data; data="$(gql '{"query":"{dockerScanTools(list:{}){items{id name}}}"}')"
   local found=0
@@ -167,8 +176,8 @@ resolve_tools() {
     local pair
     pair="$(echo "$data" | jq -r --arg t "$t" \
       '[.dockerScanTools.items[] | select(.id == $t or (.name | ascii_downcase) == ($t | ascii_downcase))][0] | select(.) | "\(.id)\t\(.name)"')"
-    [ -n "$pair" ] || fail "scan tool '$t' not found. Available: $(echo "$data" | jq -r '[.dockerScanTools.items[].name] | join(", ")')"
-    echo "$pair"
+    [ -n "$pair" ] || fail "scan tool '$t' is not available to tenant '$TENANT'. Open $APP_URL to see the scanners this workspace can run, and pass the id shown there."
+    printf '%s\t%s\n' "${pair%%$'\t'*}" "$(scanner_display "${pair#*$'\t'}")"
     found=1
   done
   [ "$found" -eq 1 ] || fail "no scan tools provided"
@@ -242,15 +251,15 @@ ok "resolved '$REPO_FULLNAME'"
 
 # --- [3/5] resolve scan tools ----------------------------------------------
 step 3 "Resolve scan tools"
-declare -a TOOL_IDS=() TOOL_NAMES=()
+declare -a TOOL_IDS=() TOOL_LABELS=()
 # resolve_tools is captured into a variable rather than consumed through a process
 # substitution: a `fail` inside `< <(...)` would only kill the subshell and let the
 # run continue with an empty tool list and exit 0.
 TOOL_LIST="$(resolve_tools)" || exit 1
-while IFS=$'\t' read -r tid tname; do
+while IFS=$'\t' read -r tid tlabel; do
   [ -n "$tid" ] || continue
-  TOOL_IDS+=("$tid"); TOOL_NAMES+=("$tname")
-  info "tool" "$tname ($tid)"
+  TOOL_IDS+=("$tid"); TOOL_LABELS+=("$tlabel")
+  info "tool" "$tlabel ($tid)"
 done <<< "$TOOL_LIST"
 ok "${#TOOL_IDS[@]} scan tool(s) selected"
 
@@ -259,8 +268,7 @@ step 4 "Run scans on branch '$BRANCH'"
 declare -a SCANS=() SCAN_LABELS=() SCAN_DURATIONS=()
 SCAN_IDS=""
 for i in "${!TOOL_IDS[@]}"; do
-  tname="${TOOL_NAMES[$i]}"
-  label="$(scanner_display "$tname")"
+  label="${TOOL_LABELS[$i]}"
   srid="$(start_scan "${TOOL_IDS[$i]}")"
   [ -n "$srid" ] || fail "scan did not return a scan result id (tool '$label')"
   SCANS+=("$srid"); SCAN_LABELS+=("$label")

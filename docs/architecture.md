@@ -95,8 +95,10 @@ sequenceDiagram
    and enabled flag, and warns if the repository is disabled, or private with no
    `git-token-id`. See [the resolution caveat](troubleshooting.md#the-wrong-repository-is-scanned).
 3. **Resolve the scanners.** `dockerScanTools` is queried once and each entry in `scan-tools`
-   is matched against a tool id or a tool name, case-insensitively. An unknown name aborts the
-   run and lists the available tools, before any scan is started.
+   is matched against a tool id or a tool name, case-insensitively. An unknown entry aborts the
+   run before any scan is started; the failure names the entry that was rejected, never the
+   scanners that would have resolved. Each resolved tool is carried onward under its product
+   name, so the stored name is not available to print.
 4. **Start and await the scans.** One `startRepositoryScan` mutation per scanner, all fired
    before any waiting begins, then `scanResult { status }` is polled every `poll-interval`
    seconds until each reaches `SUCCESS`. `FAILED` or `CANCELLED` fails the job immediately.

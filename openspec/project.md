@@ -75,9 +75,10 @@ repository from a workflow and pointing it at a non-prod Vulnara via the `*-url`
 - **Repository**: a repository must already exist in Vulnara and be enabled before it
   can be scanned. Private repositories additionally need a Vulnara **git token id**
   so the platform can clone them.
-- **Scan tool** (`dockerScanTools`): the scanners Vulnara can run, referenced by id or
-  by name (e.g. `AEGIS`, `pdd`, `trivy`, `secret_scanner`). The action maps internal
-  tool names to their user-facing codenames (Ripley, Bishop, Hicks, Ash) for display.
+- **Scan tool** (`dockerScanTools`): the scanners Vulnara can run, referenced by id or by
+  the name the platform stores them under. The stored name is how a scan is executed, not
+  what the scan is called: the action maps it to the product name before anything is
+  printed, and reports an unmapped one as `Unknown scanner` rather than as itself.
 - **Scan result** (`scanResult`): one run of one tool against one branch; its `status`
   progresses to a terminal `SUCCESS`, `FAILED` or `CANCELLED`.
 - **Finding** (`scanFindings`): a code/secret finding with a `severity`
