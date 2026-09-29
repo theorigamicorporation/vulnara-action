@@ -311,6 +311,57 @@ J
     "gitlab blob path"
 }
 
+provider_repository_fixture() {
+  fixture repositories.json <<J
+{"data":{"repositories":{"items":[
+  {"id":"repo-1111","repositoryName":"$2","private":false,"enabled":true,
+   "programmingLanguage":["Go"],"cloneUrl":null,
+   "gitEntity":{"__typename":"Organization","name":"acme","gitType":"$1","htmlUrl":"https://git.example.test/acme"}}
+]}}}
+J
+}
+
+# spec: findings-gate-reporting / Requirement: Link findings to source lines /
+#       Scenario: Located finding on a Bitbucket, Azure DevOps or Forgejo repository
+test_bitbucket_repositories_use_the_src_path() {
+  env_set "INPUT_FAIL-ON" "none"
+  use_github_files
+  provider_repository_fixture bitbucket widgets
+  findings_fixture scanFindings.json HIGH
+  run_action
+  assert_success
+  assert_contains "$(summary)" "https://git.example.test/acme/widgets/src/0123456789abcdef0123456789abcdef01234567/src/app-0.go#lines-10" \
+    "bitbucket src path"
+}
+
+# spec: findings-gate-reporting / Requirement: Link findings to source lines /
+#       Scenario: Located finding on a Bitbucket, Azure DevOps or Forgejo repository
+test_azure_devops_repositories_use_the_path_query() {
+  env_set "INPUT_FAIL-ON" "none"
+  use_github_files
+  provider_repository_fixture azure_devops web/widgets
+  findings_fixture scanFindings.json HIGH
+  run_action
+  assert_success
+  assert_contains "$(summary)" "https://git.example.test/acme/web/_git/widgets?path=/src/app-0.go&version=GC0123456789abcdef0123456789abcdef01234567&line=10&lineEnd=10&lineStartColumn=1&lineEndColumn=1" \
+    "azure path query"
+}
+
+# spec: findings-gate-reporting / Requirement: Link findings to source lines /
+#       Scenario: Located finding on a Bitbucket, Azure DevOps or Forgejo repository
+test_forgejo_repositories_use_the_src_commit_path() {
+  env_set "INPUT_FAIL-ON" "none"
+  use_github_files
+  provider_repository_fixture forgejo widgets
+  findings_fixture scanFindings.json HIGH
+  run_action
+  assert_success
+  local s; s="$(summary)"
+  assert_contains "$s" "https://git.example.test/acme/widgets/src/commit/0123456789abcdef0123456789abcdef01234567/src/app-0.go#L10" \
+    "forgejo src commit path"
+  assert_not_contains "$s" "/blob/" "no github blob path"
+}
+
 # spec: findings-gate-reporting / Requirement: Link findings to source lines /
 #       Scenario: Finding without commit or repository URL
 test_finding_without_a_commit_hash_is_not_linked() {
