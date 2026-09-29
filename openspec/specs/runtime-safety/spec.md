@@ -29,9 +29,15 @@ Where a helper that can abort must feed a loop, its output SHALL be captured
 into a variable first and the loop SHALL read from that variable, so the abort
 propagates before the loop begins. The tool resolver is consumed this way.
 
+This requirement governs *that* a run fails loudly, never what a failure message
+says. What an annotation may contain belongs to the capability that raises it:
+the tool-resolution message is specified by `scan-orchestration`, which forbids
+it from naming any scanner the platform offers.
+
 #### Scenario: Requested scan tool does not exist
-- **WHEN** `scan-tools` names a tool the platform does not offer
-- **THEN** the run emits a `::error::` annotation naming the available tools and exits non-zero
+- **WHEN** `scan-tools` names a tool the resolver cannot match
+- **THEN** the run emits a `::error::` annotation and exits non-zero, rather than continuing with
+  an empty tool list and reporting a pass
 - **AND** no scan is started
 
 #### Scenario: Tool resolution feeds a loop
