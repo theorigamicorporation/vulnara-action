@@ -312,20 +312,42 @@ test_sev_label_renders_display_names() {
   assert_eq "none"     "$(prelude_call sev_label INFO)"     "unknown severity"
 }
 
-# spec: scan-orchestration / Requirement: Never print a scanner's stored name
-test_scanner_display_maps_internal_names_to_codenames() {
-  assert_eq "Ripley" "$(prelude_call scanner_display AEGIS)"          "AEGIS -> Ripley"
-  assert_eq "Ripley" "$(prelude_call scanner_display aegis)"          "aegis -> Ripley"
-  assert_eq "Bishop" "$(prelude_call scanner_display pdd)"            "pdd -> Bishop"
-  assert_eq "Hicks"  "$(prelude_call scanner_display trivy)"          "trivy -> Hicks"
-  assert_eq "Ash"    "$(prelude_call scanner_display secret_scanner)" "secret_scanner -> Ash"
-  assert_eq "Secret Scanner" "$(prelude_call scanner_display SECRET_SCANNER)" "SECRET_SCANNER passthrough"
-  assert_eq "Personal Data Scanner" "$(prelude_call scanner_display personal_data_scanner)" "personal data scanner"
+# spec: scan-orchestration / Requirement: Never identify a scanner to the caller
+test_category_display_uses_the_shared_vocabulary() {
+  assert_eq "Code analysis" "$(prelude_call category_display sast)"    "sast"
+  assert_eq "Dependencies"  "$(prelude_call category_display sca)"     "sca"
+  assert_eq "Secrets"       "$(prelude_call category_display secrets)" "secrets"
+  assert_eq "Personal data" "$(prelude_call category_display pii)"     "pii"
+  assert_eq "Dependencies"  "$(prelude_call category_display SCA)"     "the wire value is matched case-insensitively"
 }
 
-# spec: scan-orchestration / Requirement: Never print a scanner's stored name /
-#       Scenario: A scanner the mapping does not cover
-test_scanner_display_fails_closed_on_an_unmapped_name() {
-  assert_eq "Unknown scanner" "$(prelude_call scanner_display custom-tool)" "unmapped name"
-  assert_eq "Unknown scanner" "$(prelude_call scanner_display AEGIS_v2)"    "a scanner added upstream"
+# spec: scan-orchestration / Requirement: Never identify a scanner to the caller /
+#       Scenario: A scanner whose categories cannot be resolved
+test_category_display_falls_back_to_uncategorised() {
+  assert_eq "Uncategorised" "$(prelude_call category_display '')"           "no category"
+  assert_eq "Uncategorised" "$(prelude_call category_display dast)"         "a category this action does not know"
+  assert_eq "Uncategorised" "$(prelude_call category_display AEGIS)"        "a scanner name is not a category"
+  assert_eq "Uncategorised" "$(prelude_call categories_display '')"         "an empty category set"
+}
+
+# spec: scan-orchestration / Requirement: Never identify a scanner to the caller
+test_categories_display_joins_and_deduplicates() {
+  assert_eq "Dependencies, Secrets" "$(prelude_call categories_display sca,secrets)" "a scanner serving two categories"
+  assert_eq "Secrets" "$(prelude_call categories_display secrets,secrets)" \
+    "a repeated category collapses, so the label does not count scanners"
+  assert_eq "Secrets, Uncategorised" "$(prelude_call categories_display secrets,dast)" \
+    "an unknown category is shown as Uncategorised beside the known one"
+}
+
+# spec: scan-orchestration / Requirement: Never identify a scanner to the caller
+# The codenames are retired from every customer surface. This asserts on the
+# source rather than on a run, because a mapping that exists is a mapping that
+# will be printed by the next line someone adds.
+test_no_scanner_codename_appears_in_the_action() {
+  local src; src="$(cat "$ENTRYPOINT")"
+  for codename in Ripley Bishop Hicks; do
+    assert_not_contains "$src" "$codename" "the action must not carry the codename '$codename'"
+  done
+  assert_eq "0" "$(grep -cE '\bAsh\b' "$ENTRYPOINT" || true)" "the action must not carry the codename 'Ash'"
+  assert_not_contains "$src" "scanner_display" "the scanner-name mapping must be gone, not renamed"
 }

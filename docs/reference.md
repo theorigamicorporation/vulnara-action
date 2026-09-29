@@ -47,27 +47,50 @@ Three limits worth knowing:
 
 ## Scanners
 
-`scan-tools` accepts either the tool id or the tool name from Vulnara's `dockerScanTools`.
-Name matching is case-insensitive; id matching is exact. Comma-separate for several, and
-surrounding whitespace is trimmed. The ids are listed against each scanner in the Vulnara
-application, and are the better thing to pass: they are stable, and they keep an internal name
-out of a workflow file that is often public.
+`scan-tools` accepts a tool id from Vulnara's `dockerScanTools`. Comma-separate for several, and
+surrounding whitespace is trimmed. Ids are listed against each scanner in the Vulnara
+application. **Pass ids.** A tool name is still matched, case-insensitively, while the gateway
+still returns one, but scanner names are being removed from every customer-facing part of the
+API, and a `scan-tools` entry that names one stops resolving on the day that lands.
 
-Nothing the action prints uses the stored tool name. The console log, the job summary and every
-annotation name a scanner by its product name, resolved through a single mapping in
-`entrypoint.sh`. A stored name that mapping does not cover is reported as `Unknown scanner`, not
-as itself: the fallback fails closed, so a scanner added to the platform cannot leak its name
-into a consumer's CI log on the first run after it is added, which is exactly when nobody is
-looking. `Unknown scanner` in a summary row means this action is missing a mapping, not that you
-requested something strange.
+The action tolerates that removal rather than breaking on it. The `dockerScanTools` selection set
+is assembled from the fields the schema actually has: a field the gateway has dropped is
+identified from the validation error and dropped from the query, then the query is retried.
+Selecting it unconditionally would fail the whole query, so a run that passed an id would break
+exactly as hard as one that passed a name, and the annotation would blame the workflow's input
+for a change made on the platform side. Any GraphQL error that is not a rejected optional field
+still aborts the run with the gateway's own wording.
 
-An entry matching no id and no name aborts the run before any scan starts. The failure names
-what you passed and where to look the right value up, and deliberately does not list the
-scanners that would have worked — a CI log is world-readable on a public repository, and a typo
-should not hand a reader the roster:
+Nothing the action prints identifies a scanner. A scan is labelled by the **category** it covers,
+which is what the scan looked for rather than what ran it:
+
+| Wire value | Label |
+|---|---|
+| `sast` | Code analysis |
+| `sca` | Dependencies |
+| `secrets` | Secrets |
+| `pii` | Personal data |
+
+A scanner serves one or more categories, so a label can be a set, joined with commas and
+deduplicated: two categories that render to the same label collapse to one, because a repeated
+label counts scanners. When no category can be resolved — a gateway that does not expose
+`categories`, or a tool with none recorded — the label is `Uncategorised`. That is display only:
+it is never sent to the platform and is not a category the platform knows about.
+
+An entry matching no id, and no name while names still resolve, aborts the run before any scan
+starts. The failure names what you passed and where to look the right value up, and deliberately
+does not list the scanners that would have worked — a CI log is world-readable on a public
+repository, and a typo should not hand a reader the roster:
 
 ```
 scan tool 'nosuchtool' is not available to tenant 'acme'. Open https://vulnara.rso.dev to see the scanners this workspace can run, and pass the id shown there.
+```
+
+An entry that is not an id, against a gateway that no longer resolves names, says so instead of
+blaming the tenant's scanner availability:
+
+```
+scan tool 'AEGIS' is not a scan tool id, and this Vulnara gateway no longer resolves scan tools by name. Open https://vulnara.rso.dev, copy the id shown against the scanner you want, and use that in scan-tools.
 ```
 
 ## The job summary
@@ -78,7 +101,7 @@ When `GITHUB_STEP_SUMMARY` is set, the action appends, in order:
    returned a URL), provider and visibility, branch, languages, the gate setting, the highest
    severity and the run duration.
 2. The per-severity counts and the total.
-3. One row per scan: the scanner's product name, duration, finding count, and a link to the scan at
+3. One row per scan: the category it covered, duration, finding count, and a link to the scan at
    `<app-url>/repository-scans/<id>`.
 4. A detailed findings table, only when the total is above zero.
 

@@ -6,9 +6,7 @@ result, aggregating them by severity, deciding whether the build passes the `fai
 publishing the action outputs, and rendering the GitHub job summary with links back into the
 Vulnara platform and to the offending lines of code. This is the part of the action that CI
 users see and that determines whether the job succeeds or fails.
-
 ## Requirements
-
 ### Requirement: Collect findings per scan
 The system SHALL query `scanFindings` filtered by `scanResultId` for each completed scan and
 read the `id`, `severity`, `file`, `line`, `confidence` and `commitScan.commitHash` of every
@@ -71,8 +69,8 @@ severity or `none`, and `passed` is `true` or `false`.
 The system SHALL append a Markdown summary to the file named by `GITHUB_STEP_SUMMARY` when it
 is set, containing a pass/fail heading, a table of repository, provider, visibility, branch,
 languages, gate setting, highest severity and total duration, a severity count table, and a
-per-scan table with the tool display name, duration, finding count and a link to
-`<app-url>/repository-scans/<scan result id>`.
+per-scan table headed `Category`, carrying the category label each scan covered, its duration,
+its finding count and a link to `<app-url>/repository-scans/<scan result id>`.
 
 #### Scenario: Summary written after a scan run
 - **WHEN** the scans complete and `GITHUB_STEP_SUMMARY` is set
@@ -80,16 +78,22 @@ per-scan table with the tool display name, duration, finding count and a link to
 - **AND** the repository cell links to the repository browsing URL when one was resolved,
   and is plain code text otherwise
 
+#### Scenario: Per-scan rows carry no scanner identity
+- **WHEN** the per-scan table is rendered
+- **THEN** each row's first cell is the category label for that scan
+- **AND** no scanner name, codename or product name appears in the summary
+
 #### Scenario: Summary unavailable
 - **WHEN** `GITHUB_STEP_SUMMARY` is not set
 - **THEN** no summary is rendered and the run otherwise behaves identically
 
 ### Requirement: Link findings to source lines
 The system SHALL include a detailed findings table when the total finding count is greater
-than zero, listing severity, location, tool and confidence for findings that have a `file`,
-sorted by descending severity rank and capped at 50 rows. Each location SHALL link to the
-file at the scanned commit hash using the `/-/blob/` path form for `gitlab` providers and
-`/blob/` otherwise, with a `#L<line>` fragment when a line is known.
+than zero, listing severity, location, the category label of the scan that reported the finding,
+and confidence, for findings that have a `file`, sorted by descending severity rank and capped at
+50 rows. Each location SHALL link to the file at the scanned commit hash using the `/-/blob/` path
+form for `gitlab` providers and `/blob/` otherwise, with a `#L<line>` fragment when a line is
+known.
 
 #### Scenario: Located finding with a commit hash
 - **WHEN** a finding has a `file`, a `line` and a `commitScan.commitHash`, and the repository
@@ -109,3 +113,4 @@ file at the scanned commit hash using the `/-/blob/` path form for `gitlab` prov
 - **WHEN** more than 50 findings have a file
 - **THEN** only the 50 highest-severity rows are rendered
 - **AND** a note states how many located findings exist in total and points to the scans
+

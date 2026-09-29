@@ -149,7 +149,7 @@ before adding a second scanner.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id. |
-| `scan-tools` | yes | | Comma-separated scanner names or ids. |
+| `scan-tools` | yes | | Comma-separated scan tool ids. Names still resolve while the gateway returns them. |
 | `branch` | no | triggering branch | Branch to scan. |
 | `repository` | no | current repo | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repositories). |

@@ -261,12 +261,15 @@ test_tools_resolved_by_name_and_by_id() {
   env_set "INPUT_SCAN-TOOLS" "aegis, 22222222-3333-4444-5555-666666666666"
   run_action
   assert_success
-  assert_info "tool" "Ripley (11111111-2222-3333-4444-555555555555)" "name match is case-insensitive"
-  assert_info "tool" "Bishop (22222222-3333-4444-5555-666666666666)" "id match"
+  assert_info "category" "Dependencies, Secrets (11111111-2222-3333-4444-555555555555)" "name match is case-insensitive"
+  assert_info "category" "Personal data (22222222-3333-4444-5555-666666666666)" "id match"
   assert_contains "$ERR" "2 scan tool(s) selected" "tool count reported"
   assert_eq "2" "$(graphql_count startRepositoryScan)" "one scan per tool"
   assert_not_contains "$ERR" "AEGIS" "the stored name of a resolved tool is never logged"
   assert_not_contains "$ERR" "pdd" "the stored name of a tool resolved by id is never logged"
+  for codename in Ripley Bishop Hicks Ash; do
+    assert_not_contains "$ERR" "$codename" "the codename '$codename' is never logged"
+  done
 }
 
 # spec: scan-orchestration / Requirement: Resolve the requested scan tools
@@ -274,8 +277,9 @@ test_tool_entries_are_trimmed() {
   env_set "INPUT_SCAN-TOOLS" "   trivy   "
   run_action
   assert_success
-  assert_info "tool" "Hicks (33333333-4444-5555-6666-777777777777)" "surrounding whitespace trimmed"
-  assert_contains "$ERR" "started 'Hicks'" "display codename used for the scan"
+  assert_info "category" "Dependencies (33333333-4444-5555-6666-777777777777)" "surrounding whitespace trimmed"
+  assert_contains "$ERR" "started 'Dependencies'" "the scan is logged under its category"
+  assert_not_contains "$ERR" "Hicks" "the codename is not used as the label"
   assert_not_contains "$ERR" "trivy" "the stored name is not echoed back"
 }
 
@@ -303,24 +307,107 @@ test_unknown_tool_failure_leaks_no_scanner_name() {
   assert_not_contains "$ERR" "Available:" "no roster is printed"
 }
 
-# spec: scan-orchestration / Requirement: Never print a scanner's stored name /
-#       Scenario: A scanner the mapping does not cover
-test_unmapped_scanner_is_reported_as_unknown() {
+# spec: scan-orchestration / Requirement: Never identify a scanner to the caller /
+#       Scenario: A scanner whose categories cannot be resolved
+test_scanner_without_categories_is_reported_as_uncategorised() {
   env_set "INPUT_SCAN-TOOLS" "beyond-the-map"
   export GITHUB_STEP_SUMMARY="$WORKDIR/summary.md"
   : > "$GITHUB_STEP_SUMMARY"
   env_set "GITHUB_STEP_SUMMARY" "$GITHUB_STEP_SUMMARY"
   fixture dockerScanTools.json <<'J'
 {"data":{"dockerScanTools":{"items":[
-  {"id": "99999999-0000-1111-2222-333333333333", "name": "beyond-the-map"}
+  {"id": "99999999-0000-1111-2222-333333333333", "name": "beyond-the-map", "categories": []}
 ]}}}
 J
   run_action
   assert_success
-  assert_info "tool" "Unknown scanner (99999999-0000-1111-2222-333333333333)" "unmapped tool shown as unknown"
-  assert_contains "$ERR" "started 'Unknown scanner'" "the scan is logged under the placeholder"
+  assert_info "category" "Uncategorised (99999999-0000-1111-2222-333333333333)" "a tool with no category is shown as Uncategorised"
+  assert_contains "$ERR" "started 'Uncategorised'" "the scan is logged under the placeholder"
   assert_not_contains "$ERR" "beyond-the-map" "the stored name reaches no log line"
   assert_not_contains "$(summary)" "beyond-the-map" "the stored name reaches no summary row"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
+#       Scenario: The gateway has no categories field
+# The gateway that ships today has no DockerScanTool.categories. Selecting it
+# unconditionally would fail the whole query and start no scan, so the resolver
+# narrows the selection and retries.
+test_a_gateway_without_categories_still_resolves_and_scans() {
+  fixture dockerScanTools.1.json <<'J'
+{"errors":[{"message":"Cannot query field \"categories\" on type \"DockerScanTool\".","extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
+J
+  fixture dockerScanTools.json <<'J'
+{"data":{"dockerScanTools":{"items":[
+  {"id": "11111111-2222-3333-4444-555555555555", "name": "AEGIS"}
+]}}}
+J
+  run_action
+  assert_success "a gateway without .categories must not fail the run"
+  assert_info "category" "Uncategorised (11111111-2222-3333-4444-555555555555)" "no category is known, so the label is the fallback"
+  assert_eq "1" "$(graphql_count startRepositoryScan)" "the scan is still started"
+  assert_not_contains "$ERR" "GraphQL request failed" "the recoverable validation error is not surfaced"
+  assert_not_contains "$ERR" "AEGIS" "the stored name is still not logged"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
+#       Scenario: The gateway has no name field
+# Owner decision 3 removes DockerScanTool.name. An id pinned in a consumer's
+# workflow file must keep working across that change: before this, the query
+# selected `name` unconditionally, so an id-based run failed exactly as hard as
+# a name-based one and the annotation blamed the caller's input.
+test_a_gateway_without_name_still_resolves_an_id() {
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555"
+  fixture dockerScanTools.1.json <<'J'
+{"errors":[{"message":"Cannot query field \"name\" on type \"DockerScanTool\".","extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
+J
+  fixture dockerScanTools.json <<'J'
+{"data":{"dockerScanTools":{"items":[
+  {"id": "11111111-2222-3333-4444-555555555555", "categories": ["sca","secrets"]},
+  {"id": "22222222-3333-4444-5555-666666666666", "categories": ["pii"]}
+]}}}
+J
+  run_action
+  assert_success "a pinned tool id must keep working once .name is removed"
+  assert_info "category" "Dependencies, Secrets (11111111-2222-3333-4444-555555555555)" "resolved by id alone"
+  assert_eq "1" "$(graphql_count startRepositoryScan)" "the scan is started"
+  assert_not_contains "$ERR" "GraphQL request failed" "the recoverable validation error is not surfaced"
+  assert_not_contains "$ERR" "not available to tenant" "the run does not blame the caller's input for a schema change"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
+#       Scenario: A name is requested from a gateway that resolves only ids
+test_a_name_against_a_gateway_without_name_says_ids_are_required() {
+  env_set "INPUT_SCAN-TOOLS" "AEGIS"
+  fixture dockerScanTools.1.json <<'J'
+{"errors":[{"message":"Cannot query field \"name\" on type \"DockerScanTool\".","extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
+J
+  fixture dockerScanTools.json <<'J'
+{"data":{"dockerScanTools":{"items":[
+  {"id": "11111111-2222-3333-4444-555555555555", "categories": ["sca"]}
+]}}}
+J
+  run_action
+  assert_failure "a name that can no longer be resolved must fail the run"
+  assert_contains "$ERR" "::error::scan tool 'AEGIS' is not a scan tool id, and this Vulnara gateway no longer resolves scan tools by name." \
+    "the failure says what actually went wrong"
+  assert_contains "$ERR" "https://app.example.test" "points at the Vulnara application for the id"
+  assert_not_contains "$ERR" "is not available to tenant" "it does not blame the tenant's availability"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
+}
+
+# spec: scan-orchestration / Requirement: Send tenant-scoped GraphQL requests /
+#       Scenario: GraphQL returns errors
+# Narrowing the selection is only for a rejected optional field. Any other
+# GraphQL error still aborts with the gateway's own wording.
+test_a_non_field_error_on_the_catalogue_still_fails_the_run() {
+  fixture dockerScanTools.json <<'J'
+{"errors":[{"message":"tenant is not permitted to list scan tools","extensions":{"code":"FORBIDDEN"}}]}
+J
+  run_action
+  assert_failure "a real GraphQL error must fail the run"
+  assert_contains "$ERR" "FORBIDDEN: tenant is not permitted to list scan tools" "the gateway's error is printed"
+  assert_contains "$ERR" "::error::GraphQL request failed" "the run aborts on it"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
 }
 
 # spec: scan-orchestration / Requirement: Resolve the requested scan tools /
@@ -349,8 +436,8 @@ test_scans_are_started_per_tool_with_the_resolved_input() {
   assert_contains "$bodies" '"dockerScanToolId":"33333333-4444-5555-6666-777777777777"' "second tool id"
   assert_contains "$bodies" '"createIssue":true' "createIssue boolean"
   assert_contains "$bodies" '"autoRemediate":true' "autoRemediate boolean"
-  assert_contains "$ERR" "started 'Ripley' -> scan scan-aaaaaaaa-0001" "first scan logged with its codename"
-  assert_contains "$ERR" "started 'Hicks' -> scan scan-bbbbbbbb-0002" "second scan logged with its codename"
+  assert_contains "$ERR" "started 'Dependencies, Secrets' -> scan scan-aaaaaaaa-0001" "first scan logged with its category"
+  assert_contains "$ERR" "started 'Dependencies' -> scan scan-bbbbbbbb-0002" "second scan logged with its category"
 }
 
 # spec: scan-orchestration / Requirement: Start one scan per tool
@@ -378,7 +465,7 @@ test_missing_scan_result_id_fails_the_run() {
 J
   run_action
   assert_failure "a missing scan result id must fail the run"
-  assert_contains "$ERR" "::error::scan did not return a scan result id (tool 'Ripley')" "names the tool"
+  assert_contains "$ERR" "::error::scan did not return a scan result id (tool 'Dependencies, Secrets')" "names the category"
 }
 
 # spec: scan-orchestration / Requirement: Wait for scans to finish /
@@ -398,7 +485,7 @@ J
   assert_eq "3" "$(graphql_count scanResult)" "polled until the terminal status"
   assert_contains "$ERR" "PENDING (" "pending transition logged"
   assert_contains "$ERR" "RUNNING (" "running transition logged"
-  assert_contains "$ERR" "Ripley completed in" "completion logged with the elapsed time"
+  assert_contains "$ERR" "Dependencies, Secrets completed in" "completion logged with the elapsed time"
   assert_eq "2" "$(sleep_count)" "slept between polls only"
   assert_contains "$(cat "$STUB_DIR/sleep.log")" "1" "slept for the poll-interval"
 }
@@ -424,7 +511,7 @@ test_failed_scan_fails_the_run() {
 J
   run_action
   assert_failure "a FAILED scan must fail the run"
-  assert_contains "$ERR" "::error::scan for 'Ripley' ended as FAILED (id scan-aaaaaaaa-0001)" "failure message"
+  assert_contains "$ERR" "::error::scan for 'Dependencies, Secrets' ended as FAILED (id scan-aaaaaaaa-0001)" "failure message"
   assert_eq "0" "$(graphql_count scanFindings)" "findings are not collected"
 }
 
@@ -448,6 +535,6 @@ test_scan_timeout_fails_the_run() {
 J
   run_action
   assert_failure "an unfinished scan must fail once the timeout passes"
-  assert_contains "$ERR" "::error::timed out after 0s waiting for 'Ripley' (still RUNNING, id scan-aaaaaaaa-0001)" \
+  assert_contains "$ERR" "::error::timed out after 0s waiting for 'Dependencies, Secrets' (still RUNNING, id scan-aaaaaaaa-0001)" \
     "timeout message names the timeout, status and scan id"
 }

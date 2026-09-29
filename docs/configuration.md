@@ -12,7 +12,7 @@ the outputs it writes.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a GitHub Actions secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id, sent as the `X-Tenant` header on every request. |
-| `scan-tools` | yes | | Comma-separated scanner names or ids. See [Reference](reference.md#scanners). |
+| `scan-tools` | yes | | Comma-separated scan tool ids. See [Reference](reference.md#scanners). |
 | `branch` | no | `GITHUB_REF_NAME` | Branch to scan. |
 | `repository` | no | `GITHUB_REPOSITORY` | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id. Required for private repositories. |
