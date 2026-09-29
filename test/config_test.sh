@@ -351,3 +351,15 @@ test_no_scanner_codename_appears_in_the_action() {
   assert_eq "0" "$(grep -cE '\bAsh\b' "$ENTRYPOINT" || true)" "the action must not carry the codename 'Ash'"
   assert_not_contains "$src" "scanner_display" "the scanner-name mapping must be gone, not renamed"
 }
+
+# spec: scan-orchestration / Requirement: Never identify a scanner to the caller
+# `openspec validate --specs --strict` checks each spec's structure, not whether
+# two specs agree. Two live requirements mandating opposite things about the same
+# annotation is how the roster comes back with a spec citation behind it, so the
+# ban is asserted across every committed spec and not only the one that states
+# it.
+test_no_committed_spec_mandates_enumerating_the_roster() {
+  local hits
+  hits="$(grep -rnEi 'nam(e|es|ing) the available tools|Available:' "$REPO_DIR/openspec/specs" || true)"
+  assert_eq "" "$hits" "no committed spec may require the failure to enumerate the catalogue"
+}
