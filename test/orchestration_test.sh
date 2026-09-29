@@ -160,6 +160,38 @@ J
   assert_info "Languages" "n/a" "no languages reported as n/a"
 }
 
+# spec: scan-orchestration / Requirement: Build a browsing URL for every provider /
+#       Scenario: Azure DevOps repository
+test_azure_devops_browsing_url_includes_the_git_segment() {
+  fixture repositories.json <<'J'
+{"data":{"repositories":{"items":[
+  {"id":"repo-1111","repositoryName":"web/widgets","private":false,"enabled":true,
+   "programmingLanguage":["Go"],"cloneUrl":"https://dev.azure.com/acme/web/_git/widgets",
+   "gitEntity":{"__typename":"Organization","name":"acme","gitType":"azure_devops","htmlUrl":"https://dev.azure.com/acme"}}
+]}}}
+J
+  run_action
+  assert_success
+  assert_info "Provider" "azure_devops" "provider"
+  assert_info "URL" "https://dev.azure.com/acme/web/_git/widgets" "project and _git segment"
+}
+
+# spec: scan-orchestration / Requirement: Build a browsing URL for every provider /
+#       Scenario: Clone URL carries credentials
+test_clone_url_fallback_drops_credentials() {
+  fixture repositories.json <<'J'
+{"data":{"repositories":{"items":[
+  {"id":"repo-1111","repositoryName":"widgets","private":false,"enabled":true,
+   "programmingLanguage":["Go"],"cloneUrl":"https://x-token-auth:secret@bitbucket.org/acme/widgets.git",
+   "gitEntity":{"__typename":"Organization","name":"acme","gitType":"bitbucket","htmlUrl":null}}
+]}}}
+J
+  run_action
+  assert_success
+  assert_info "URL" "https://bitbucket.org/acme/widgets" "userinfo stripped"
+  assert_not_contains "$ERR" "secret@" "credentials never logged"
+}
+
 # spec: scan-orchestration / Requirement: Resolve the repository in Vulnara /
 #       Scenario: Repository not present in Vulnara
 test_repository_not_found_fails_the_run() {

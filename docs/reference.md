@@ -96,7 +96,14 @@ finding's `commitScan.commitHash`, its file and its line:
 | Provider | Link form |
 |---|---|
 | `gitlab` | `<repo>/-/blob/<sha>/<file>#L<line>` |
-| anything else | `<repo>/blob/<sha>/<file>#L<line>` |
+| `bitbucket` | `<repo>/src/<sha>/<file>#lines-<line>` |
+| `azure_devops` | `<repo>?path=/<file>&version=GC<sha>&line=<line>&lineEnd=<line>&lineStartColumn=1&lineEndColumn=1` |
+| `forgejo` | `<repo>/src/commit/<sha>/<file>#L<line>` |
+| `github` and anything else | `<repo>/blob/<sha>/<file>#L<line>` |
+
+For `azure_devops` the repository URL is `<htmlUrl>/<project>/_git/<repo>`, taken from a
+`repositoryName` of the form `<project>/<repo>`. Credentials in a `cloneUrl` fallback are
+dropped.
 
 When the repository URL or the commit hash is missing, the location is rendered as plain text
 rather than a link.

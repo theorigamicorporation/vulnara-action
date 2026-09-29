@@ -131,10 +131,12 @@ resolve_repository() {
   entity_url="$(echo "$item" | jq -r '.gitEntity.htmlUrl // ""')"
   clone_url="$(echo "$item" | jq -r '.cloneUrl // ""')"
   rname="$(echo "$item" | jq -r '.repositoryName')"
-  if [ -n "$entity_url" ]; then
+  if [ -n "$entity_url" ] && [ "$REPO_PROVIDER" = "azure_devops" ]; then
+    REPO_URL="${entity_url%/}/${rname%%/*}/_git/${rname#*/}"
+  elif [ -n "$entity_url" ]; then
     REPO_URL="${entity_url%/}/$rname"
   elif [ -n "$clone_url" ]; then
-    REPO_URL="${clone_url%.git}"
+    REPO_URL="$(echo "${clone_url%.git}" | sed -E 's#^(https?://)[^/@]+@#\1#')"
   else
     REPO_URL=""
   fi
@@ -375,7 +377,14 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
           if (.file // "") == "" then "-"
           else (.file + (if .line == null then "" else ":" + (.line|tostring) end)) as $txt
             | if ($base == "") or ((.commitScan.commitHash // "") == "") then $txt
-              else ($base + (if $prov=="gitlab" then "/-/blob/" else "/blob/" end) + .commitScan.commitHash + "/" + .file + (if .line==null then "" else "#L"+(.line|tostring) end)) as $u
+              else (.commitScan.commitHash) as $sha | (.line|tostring) as $n
+                | (if $prov=="gitlab" then $base + "/-/blob/" + $sha + "/" + .file + (if .line==null then "" else "#L"+$n end)
+                   elif $prov=="bitbucket" then $base + "/src/" + $sha + "/" + .file + (if .line==null then "" else "#lines-"+$n end)
+                   elif $prov=="azure_devops" then $base + "?path=/" + .file + "&version=GC" + $sha
+                     + (if .line==null then "" else "&line="+$n+"&lineEnd="+$n+"&lineStartColumn=1&lineEndColumn=1" end)
+                   elif $prov=="forgejo" then $base + "/src/commit/" + $sha + "/" + .file + (if .line==null then "" else "#L"+$n end)
+                   else $base + "/blob/" + $sha + "/" + .file + (if .line==null then "" else "#L"+$n end)
+                   end) as $u
                 | "[`" + $txt + "`](" + $u + ")"
               end
           end;
