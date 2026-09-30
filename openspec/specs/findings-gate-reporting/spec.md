@@ -6,7 +6,9 @@ result, aggregating them by severity, deciding whether the build passes the `fai
 publishing the action outputs, and rendering the GitHub job summary with links back into the
 Vulnara platform and to the offending lines of code. This is the part of the action that CI
 users see and that determines whether the job succeeds or fails.
+
 ## Requirements
+
 ### Requirement: Collect findings per scan
 The system SHALL query `scanFindings` filtered by `scanResultId` for each completed scan and
 read the `id`, `severity`, `file`, `line`, `confidence` and `commitScan.commitHash` of every
@@ -89,16 +91,26 @@ its finding count and a link to `<app-url>/repository-scans/<scan result id>`.
 
 ### Requirement: Link findings to source lines
 The system SHALL include a detailed findings table when the total finding count is greater
-than zero, listing severity, location, the category label of the scan that reported the finding,
-and confidence, for findings that have a `file`, sorted by descending severity rank and capped at
-50 rows. Each location SHALL link to the file at the scanned commit hash using the `/-/blob/` path
-form for `gitlab` providers and `/blob/` otherwise, with a `#L<line>` fragment when a line is
-known.
+than zero, listing severity, location, tool and confidence for findings that have a `file`,
+sorted by descending severity rank and capped at 50 rows. Each location SHALL link to the
+file at the scanned commit hash using the provider's path form: `/-/blob/<sha>/` for
+`gitlab`, `/src/<sha>/` with a `#lines-<line>` fragment for `bitbucket`,
+`?path=/<file>&version=GC<sha>` with `line`, `lineEnd`, `lineStartColumn` and `lineEndColumn`
+parameters for `azure_devops`, `/src/commit/<sha>/` for `forgejo`, and `/blob/<sha>/`
+otherwise, with a `#L<line>` fragment when a line is known unless the provider form says
+otherwise.
 
 #### Scenario: Located finding with a commit hash
 - **WHEN** a finding has a `file`, a `line` and a `commitScan.commitHash`, and the repository
   URL was resolved
 - **THEN** the location cell is a Markdown link to `<repo url>/blob/<commit>/<file>#L<line>`
+
+#### Scenario: Located finding on a Bitbucket, Azure DevOps or Forgejo repository
+- **WHEN** a located finding with a commit hash belongs to a `bitbucket`, `azure_devops` or
+  `forgejo` repository
+- **THEN** the location links to `<repo url>/src/<commit>/<file>#lines-<line>`,
+  `<repo url>?path=/<file>&version=GC<commit>&line=<line>&lineEnd=<line>&lineStartColumn=1&lineEndColumn=1`
+  or `<repo url>/src/commit/<commit>/<file>#L<line>` respectively
 
 #### Scenario: Finding without commit or repository URL
 - **WHEN** the repository URL is empty or the finding has no commit hash
@@ -113,4 +125,3 @@ known.
 - **WHEN** more than 50 findings have a file
 - **THEN** only the 50 highest-severity rows are rendered
 - **AND** a note states how many located findings exist in total and points to the scans
-
