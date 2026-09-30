@@ -14,7 +14,7 @@ the outputs it writes.
 | `tenant` | yes | | Vulnara tenant (workspace) id, sent as the `X-Tenant` header on every request. |
 | `scan-tools` | yes | | Comma-separated scanner names or ids. See [Reference](reference.md#scanners). |
 | `branch` | no | `GITHUB_REF_NAME` | Branch to scan. |
-| `repository` | no | `GITHUB_REPOSITORY` | `owner/name` to resolve in Vulnara. |
+| `repository` | no | `GITHUB_REPOSITORY` | `owner/name` to resolve in Vulnara. Azure DevOps also takes `org/project/repo` or `project/repo`. See [Reference](reference.md#resolving-the-repository). |
 | `git-token-id` | no | | Vulnara git token id. Required for private repositories. |
 | `fail-on` | no | `critical` | Fail at or above: `none` \| `low` \| `medium` \| `high` \| `critical`. See [the gate](reference.md#the-severity-gate). |
 | `create-issue` | no | `false` | Ask Vulnara to open an issue for findings. |

@@ -111,14 +111,35 @@ gql() {
 # --- resolve the Vulnara repository (populates REPO_* globals) -------------
 REPO_ID=""; REPO_FULLNAME=""; REPO_PROVIDER=""; REPO_VISIBILITY=""
 REPO_ENABLED=""; REPO_LANGS=""; REPO_URL=""; REPO_ENTITY=""
+REPO_QUERY='query($l:List){repositories(list:$l){total items{id repositoryName private enabled programmingLanguage cloneUrl gitEntity{__typename ... on Organization{name gitType htmlUrl} ... on GitUser{name gitType htmlUrl}}}}}'
 resolve_repository() {
-  local owner="${REPOSITORY%%/*}" name="${REPOSITORY##*/}" data item
-  data="$(gql "$(jq -n --arg n "$name" \
-    '{query:"query($l:List){repositories(list:$l){items{id repositoryName private enabled programmingLanguage cloneUrl gitEntity{__typename ... on Organization{name gitType htmlUrl} ... on GitUser{name gitType htmlUrl}}}}}",
-      variables:{l:{filters:[{field:"repositoryName",stringEquals:$n}]}}}')")"
-  item="$(echo "$data" | jq -c --arg o "$(echo "$owner" | tr '[:upper:]' '[:lower:]')" \
-    '([.repositories.items[] | select(((.gitEntity.name // "") | ascii_downcase) == $o)][0])
-       // (.repositories.items[0]) // empty')"
+  local owner="${REPOSITORY%%/*}" name="${REPOSITORY##*/}" rest="${REPOSITORY#*/}" data item azure count
+  local lowner; lowner="$(echo "$owner" | tr '[:upper:]' '[:lower:]')"
+  data="$(gql "$(jq -n --arg q "$REPO_QUERY" --arg n "$name" \
+    '{query:$q, variables:{l:{filters:[{field:"repositoryName",stringEquals:$n}]}}}')")"
+  item="$(echo "$data" | jq -c --arg o "$lowner" \
+    '[.repositories.items[] | select(.gitEntity.gitType != "azure_devops")
+       | select(((.gitEntity.name // "") | ascii_downcase) == $o)][0] // empty')"
+  if [ -z "$item" ]; then
+    # Azure stores "{project}/{repo}" under the org entity, so the name filter above never finds it.
+    azure="$(gql "$(jq -n --arg q "$REPO_QUERY" --arg s "$name" \
+      '{query:$q, variables:{l:{search:$s, limit:500}}}')")"
+    [ "$(echo "$azure" | jq '.repositories.total > (.repositories.items | length)')" = "false" ] \
+      || fail "too many repositories match '$name' in Vulnara (tenant '$TENANT') to resolve '$REPOSITORY' safely."
+    azure="$(echo "$azure" | jq -c --arg o "$lowner" --arg r "$rest" --arg full "$REPOSITORY" --arg n "$name" \
+      '[.repositories.items[] | select(.gitEntity.gitType == "azure_devops")
+        | ((.gitEntity.name // "") | ascii_downcase) as $e
+        | select(if ($r | contains("/"))
+                 then .repositoryName == $r and $e == $o
+                 else .repositoryName == $full or ($e == $o and (.repositoryName | split("/") | last) == $n)
+                 end)]')"
+    count="$(echo "$azure" | jq 'length')"
+    if [ "$count" -gt 1 ]; then
+      fail "repository '$REPOSITORY' is ambiguous in Vulnara (tenant '$TENANT'): $(echo "$azure" | jq -r '[.[] | "\(.gitEntity.name)/\(.repositoryName)"] | join(", ")'). Pass the full org/project/repo."
+    fi
+    item="$(echo "$azure" | jq -c '.[0] // empty')"
+    [ -n "$item" ] || item="$(echo "$data" | jq -c '.repositories.items[0] // empty')"
+  fi
   [ -n "$item" ] || fail "repository '$REPOSITORY' was not found in Vulnara (tenant '$TENANT'). Add it in Vulnara first."
   REPO_ID="$(echo "$item" | jq -r '.id')"
   REPO_ENTITY="$(echo "$item" | jq -r '.gitEntity.name // "?"')"
