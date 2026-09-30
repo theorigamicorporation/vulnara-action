@@ -192,18 +192,18 @@ categories_display() { # comma-separated wire values -> display label
 }
 
 # --- fetch the scan tool catalogue ----------------------------------------
-# The selection set is assembled from the fields the schema actually has, not
-# from the fields it had when this was written. `DockerScanTool.name` is on its
-# way out, because no scanner identity reaches a client any more, and
-# `.categories` is on its way in. A `scan-tools` value is pinned in a consumer's
-# own workflow file and outlives both changes.
+# `DockerScanTool.name` is not selected, and not optional: it is gone from the
+# gateway, and asking for it would fail the whole query with
+# GRAPHQL_VALIDATION_FAILED before any id was matched. Nothing here would print
+# it if it came back, either, so there is no version of this action that wants a
+# scanner name.
 #
-# This matters more than it looks: selecting a field the schema has dropped
-# fails the *whole* query with GRAPHQL_VALIDATION_FAILED, so a run that asked
-# for a tool by id fails exactly as hard as one that asked by name, and the
-# annotation blames the caller's input for a change made on our side. Narrow the
-# selection from the validation error and retry instead.
-_TOOL_OPTIONAL_FIELDS="name categories"
+# `.categories` is still narrowable. `gateway-url` is an action input, so a
+# non-prod or self-hosted gateway predating that field is a real deployment, and
+# selecting it unconditionally would turn "labelled Uncategorised" into "the run
+# fails and starts no scan" for a tool id pinned in a workflow file we do not
+# control. Narrow the selection from the validation error and retry instead.
+_TOOL_OPTIONAL_FIELDS="categories"
 scan_tool_catalogue() {
   local optional="$_TOOL_OPTIONAL_FIELDS" sel resp keep f attempt=0
   while :; do
@@ -232,27 +232,38 @@ scan_tool_catalogue() {
   done
 }
 
-# --- resolve scan tools (by id, or by name while the gateway still has one) --
-# Echoes "id<TAB>category label" per line. No scanner identity leaves this
-# function: the caller is handed a category label and has nothing else to print.
+# --- resolve scan tools, by id --------------------------------------------
+# Echoes "id<TAB>category label" per line. No scanner identity enters this
+# function, let alone leaves it: the catalogue carries ids and categories, and
+# the caller is handed a category label and has nothing else it could print.
+#
+# `scan-tools` takes ids only. It used to accept a stored name as well, which
+# worked because the gateway returned one; it does not, so a name cannot be
+# matched against anything and the failure has to say that rather than blame the
+# tenant's availability. A category label is not accepted here either: a
+# category scan is one request that fans out server-side, which is
+# startRepositoryCategoryScan, not N of these.
 resolve_tools() {
-  local data; data="$(scan_tool_catalogue)"
-  local by_name
-  by_name="$(echo "$data" | jq -r 'if [(.dockerScanTools.items // [])[] | has("name")] | any then "yes" else "no" end')"
-  local found=0
+  local raw t found=0
   IFS=',' read -ra wanted <<< "$SCAN_TOOLS"
+  # Shape first, and before the catalogue is fetched: whether an entry is an id
+  # is knowable without asking the gateway, and a typo should not cost a request
+  # or borrow the catalogue's wording.
   for raw in "${wanted[@]}"; do
-    local t; t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
+    t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
+    [ -n "$t" ] || continue
+    looks_like_id "$t" && continue
+    fail "scan tool '$t' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. Open $APP_URL, copy the id shown against the scanner you want, and use that."
+  done
+  local data; data="$(scan_tool_catalogue)"
+  for raw in "${wanted[@]}"; do
+    t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
     [ -n "$t" ] || continue
     local pair
-    pair="$(echo "$data" | jq -r --arg t "$t" --arg byname "$by_name" \
-      '[.dockerScanTools.items[]
-         | select(.id == $t or ($byname == "yes" and ((.name // "") | ascii_downcase) == ($t | ascii_downcase)))][0]
+    pair="$(echo "$data" | jq -r --arg t "$t" \
+      '[.dockerScanTools.items[] | select(.id == $t)][0]
        | select(.) | "\(.id)\t\((.categories // []) | join(","))"')"
     if [ -z "$pair" ]; then
-      if [ "$by_name" = "no" ] && ! looks_like_id "$t"; then
-        fail "scan tool '$t' is not a scan tool id, and this Vulnara gateway no longer resolves scan tools by name. Open $APP_URL, copy the id shown against the scanner you want, and use that in scan-tools."
-      fi
       fail "scan tool '$t' is not available to tenant '$TENANT'. Open $APP_URL to see the scanners this workspace can run, and pass the id shown there."
     fi
     printf '%s\t%s\n' "${pair%%$'\t'*}" "$(categories_display "${pair#*$'\t'}")"

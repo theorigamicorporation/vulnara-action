@@ -43,7 +43,7 @@ use_github_files() {
 # spec: findings-gate-reporting / Requirement: Collect findings per scan /
 #       Scenario: Findings aggregated across scans
 test_findings_are_aggregated_across_scans() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_FAIL-ON" "none"
   use_github_files
   findings_fixture scanFindings.1.json CRITICAL HIGH LOW
@@ -68,7 +68,7 @@ test_findings_are_aggregated_across_scans() {
 # spec: findings-gate-reporting / Requirement: Collect findings per scan /
 #       Scenario: Scan with no findings
 test_scan_without_findings_contributes_nothing() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_FAIL-ON" "none"
   use_github_files
   findings_fixture scanFindings.1.json HIGH
@@ -174,7 +174,7 @@ test_lowest_threshold_fails_on_a_low_finding() {
 # spec: findings-gate-reporting / Requirement: Publish action outputs /
 #       Scenario: Outputs written for a failing gate
 test_outputs_are_written_before_a_failing_exit() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_FAIL-ON" "critical"
   use_github_files
   findings_fixture scanFindings.1.json CRITICAL

@@ -129,7 +129,7 @@ jobs:
           service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
           token: ${{ secrets.VULNARA_TOKEN }}
           tenant: my-tenant
-          scan-tools: AEGIS         # name or id; comma-separate for several
+          scan-tools: 11111111-2222-3333-4444-555555555555   # the id shown in Vulnara; comma-separate for several
           fail-on: high             # fail the build on High or Critical findings
           # branch defaults to the branch that triggered the workflow
           # git-token-id: <id>      # required for private repositories

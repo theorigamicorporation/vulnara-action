@@ -75,7 +75,7 @@ what to do with `passed` and `highest-severity` itself:
           service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
           token: ${{ secrets.VULNARA_TOKEN }}
           tenant: my-tenant
-          scan-tools: AEGIS
+          scan-tools: 11111111-2222-3333-4444-555555555555
           fail-on: none
       - run: echo "highest severity = ${{ steps.vulnara.outputs.highest-severity }}"
 ```

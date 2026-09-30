@@ -86,11 +86,12 @@ repository, and a typo should not hand a reader the roster:
 scan tool 'nosuchtool' is not available to tenant 'acme'. Open https://vulnara.rso.dev to see the scanners this workspace can run, and pass the id shown there.
 ```
 
-An entry that is not an id, against a gateway that no longer resolves names, says so instead of
-blaming the tenant's scanner availability:
+An entry that is not an id says so instead of blaming the tenant's scanner availability.
+`scan-tools` takes ids: the gateway does not resolve scanners by name any more, and a category
+label belongs to a category scan rather than to this input:
 
 ```
-scan tool 'AEGIS' is not a scan tool id, and this Vulnara gateway no longer resolves scan tools by name. Open https://vulnara.rso.dev, copy the id shown against the scanner you want, and use that in scan-tools.
+scan tool 'AEGIS' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. Open https://vulnara.rso.dev, copy the id shown against the scanner you want, and use that.
 ```
 
 ## The job summary

@@ -255,40 +255,51 @@ J
   assert_contains "$(graphql_body_for startRepositoryScan)" '"gitTokenId":"git-token-0001"' "git token passed to the mutation"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
-#       Scenario: Tools resolved by name and by id
-test_tools_resolved_by_name_and_by_id() {
-  env_set "INPUT_SCAN-TOOLS" "aegis, 22222222-3333-4444-5555-666666666666"
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
+#       Scenario: Tools resolved by id
+test_tools_resolved_by_id() {
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555, 22222222-3333-4444-5555-666666666666"
   run_action
   assert_success
-  assert_info "category" "Dependencies, Secrets (11111111-2222-3333-4444-555555555555)" "name match is case-insensitive"
-  assert_info "category" "Personal data (22222222-3333-4444-5555-666666666666)" "id match"
+  assert_info "category" "Dependencies, Secrets (11111111-2222-3333-4444-555555555555)" "first id"
+  assert_info "category" "Personal data (22222222-3333-4444-5555-666666666666)" "second id"
   assert_contains "$ERR" "2 scan tool(s) selected" "tool count reported"
   assert_eq "2" "$(graphql_count startRepositoryScan)" "one scan per tool"
-  assert_not_contains "$ERR" "AEGIS" "the stored name of a resolved tool is never logged"
-  assert_not_contains "$ERR" "pdd" "the stored name of a tool resolved by id is never logged"
   for codename in Ripley Bishop Hicks Ash; do
     assert_not_contains "$ERR" "$codename" "the codename '$codename' is never logged"
   done
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
+#       Scenario: The catalogue query requests no scanner name
+# The gateway has removed DockerScanTool.name, so asking for it would fail the
+# whole query before any id was matched. This asserts the request itself, not a
+# tolerance for the rejection, because there is nothing left to tolerate.
+test_the_catalogue_query_never_requests_a_name() {
+  run_action
+  assert_success
+  local body; body="$(graphql_body_for dockerScanTools)"
+  assert_not_contains "$body" "name" "the catalogue selection set must not mention name"
+  assert_contains "$body" "categories" "it selects the category vocabulary instead"
+  assert_eq "1" "$(graphql_count dockerScanTools)" "one request: nothing is retried on the happy path"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id
 test_tool_entries_are_trimmed() {
-  env_set "INPUT_SCAN-TOOLS" "   trivy   "
+  env_set "INPUT_SCAN-TOOLS" "   33333333-4444-5555-6666-777777777777   "
   run_action
   assert_success
   assert_info "category" "Dependencies (33333333-4444-5555-6666-777777777777)" "surrounding whitespace trimmed"
   assert_contains "$ERR" "started 'Dependencies'" "the scan is logged under its category"
   assert_not_contains "$ERR" "Hicks" "the codename is not used as the label"
-  assert_not_contains "$ERR" "trivy" "the stored name is not echoed back"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
 #       Scenario: Unknown tool requested
 test_unknown_tool_names_the_entry_not_the_roster() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,nosuchtool"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,99999999-9999-9999-9999-999999999999"
   run_action
-  assert_contains "$ERR" "::error::scan tool 'nosuchtool' is not available to tenant 'tenant-abc'." \
+  assert_contains "$ERR" "::error::scan tool '99999999-9999-9999-9999-999999999999' is not available to tenant 'tenant-abc'." \
     "names the rejected entry and the tenant"
   assert_contains "$ERR" "https://app.example.test" "points at the Vulnara application"
   assert_failure "an unknown tool must fail the run"
@@ -298,10 +309,10 @@ test_unknown_tool_names_the_entry_not_the_roster() {
 # spec: scan-orchestration / Requirement: Never print a scanner's stored name /
 #       Scenario: A scanner is named in the log or the summary
 test_unknown_tool_failure_leaks_no_scanner_name() {
-  env_set "INPUT_SCAN-TOOLS" "nosuchtool"
+  env_set "INPUT_SCAN-TOOLS" "99999999-9999-9999-9999-999999999999"
   run_action
   assert_failure "an unknown tool must fail the run"
-  for stored in pdd trivy secret_scanner; do
+  for stored in AEGIS pdd trivy secret_scanner; do
     assert_not_contains "$ERR" "$stored" "the failure must not enumerate '$stored'"
   done
   assert_not_contains "$ERR" "Available:" "no roster is printed"
@@ -310,35 +321,40 @@ test_unknown_tool_failure_leaks_no_scanner_name() {
 # spec: scan-orchestration / Requirement: Never identify a scanner to the caller /
 #       Scenario: A scanner whose categories cannot be resolved
 test_scanner_without_categories_is_reported_as_uncategorised() {
-  env_set "INPUT_SCAN-TOOLS" "beyond-the-map"
+  env_set "INPUT_SCAN-TOOLS" "99999999-0000-1111-2222-333333333333"
   export GITHUB_STEP_SUMMARY="$WORKDIR/summary.md"
   : > "$GITHUB_STEP_SUMMARY"
   env_set "GITHUB_STEP_SUMMARY" "$GITHUB_STEP_SUMMARY"
   fixture dockerScanTools.json <<'J'
 {"data":{"dockerScanTools":{"items":[
-  {"id": "99999999-0000-1111-2222-333333333333", "name": "beyond-the-map", "categories": []}
+  {"id": "99999999-0000-1111-2222-333333333333", "categories": []}
 ]}}}
 J
   run_action
   assert_success
   assert_info "category" "Uncategorised (99999999-0000-1111-2222-333333333333)" "a tool with no category is shown as Uncategorised"
   assert_contains "$ERR" "started 'Uncategorised'" "the scan is logged under the placeholder"
-  assert_not_contains "$ERR" "beyond-the-map" "the stored name reaches no log line"
-  assert_not_contains "$(summary)" "beyond-the-map" "the stored name reaches no summary row"
+  assert_not_contains "$(summary)" "99999999-0000" "the summary labels the scan by category, not by tool"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
 #       Scenario: The gateway has no categories field
-# The gateway that ships today has no DockerScanTool.categories. Selecting it
-# unconditionally would fail the whole query and start no scan, so the resolver
-# narrows the selection and retries.
+# `gateway-url` is an action input, so a non-prod or self-hosted gateway
+# predating DockerScanTool.categories is a real deployment. Selecting the field
+# unconditionally there would fail the whole query and start no scan, so the
+# resolver narrows the selection and retries.
+#
+# The error body below is not invented. It is what graphql-js produces for
+# `{dockerScanTools(list:{}){items{id categories}}}` against
+# vulnara-gateway-api origin/main's schema.local.graphql, which is that gateway,
+# and the gateway validates with graphql-js.
 test_a_gateway_without_categories_still_resolves_and_scans() {
   fixture dockerScanTools.1.json <<'J'
 {"errors":[{"message":"Cannot query field \"categories\" on type \"DockerScanTool\".","extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
 J
   fixture dockerScanTools.json <<'J'
 {"data":{"dockerScanTools":{"items":[
-  {"id": "11111111-2222-3333-4444-555555555555", "name": "AEGIS"}
+  {"id": "11111111-2222-3333-4444-555555555555"}
 ]}}}
 J
   run_action
@@ -346,51 +362,66 @@ J
   assert_info "category" "Uncategorised (11111111-2222-3333-4444-555555555555)" "no category is known, so the label is the fallback"
   assert_eq "1" "$(graphql_count startRepositoryScan)" "the scan is still started"
   assert_not_contains "$ERR" "GraphQL request failed" "the recoverable validation error is not surfaced"
-  assert_not_contains "$ERR" "AEGIS" "the stored name is still not logged"
+  assert_eq "2" "$(graphql_count dockerScanTools)" "the narrowed selection is a second request, not a silent give-up"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
-#       Scenario: The gateway has no name field
-# Owner decision 3 removes DockerScanTool.name. An id pinned in a consumer's
-# workflow file must keep working across that change: before this, the query
-# selected `name` unconditionally, so an id-based run failed exactly as hard as
-# a name-based one and the annotation blamed the caller's input.
-test_a_gateway_without_name_still_resolves_an_id() {
-  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555"
-  fixture dockerScanTools.1.json <<'J'
-{"errors":[{"message":"Cannot query field \"name\" on type \"DockerScanTool\".","extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
-J
-  fixture dockerScanTools.json <<'J'
-{"data":{"dockerScanTools":{"items":[
-  {"id": "11111111-2222-3333-4444-555555555555", "categories": ["sca","secrets"]},
-  {"id": "22222222-3333-4444-5555-666666666666", "categories": ["pii"]}
-]}}}
-J
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
+#       Scenario: A pinned tool id resolves against the gateway that removed the name
+# An id pinned in a consumer's workflow file has to keep working across the
+# removal of DockerScanTool.name. It does, and in one request: the name is not
+# selected at all, so there is nothing for the gateway to reject.
+#
+# Verified against the real schema rather than a stub: every operation this
+# action sends validates against vulnara-gateway-api c3648c96's
+# schema.local.graphql, and the only one that did not was
+# `{dockerScanTools(list:{}){items{id name categories}}}`, failing with
+# `Cannot query field "name" on type "DockerScanTool".` That query is no longer
+# sent.
+test_a_pinned_tool_id_resolves_in_one_request() {
+  env_set "INPUT_SCAN-TOOLS" "22222222-3333-4444-5555-666666666666"
   run_action
   assert_success "a pinned tool id must keep working once .name is removed"
-  assert_info "category" "Dependencies, Secrets (11111111-2222-3333-4444-555555555555)" "resolved by id alone"
+  assert_info "category" "Personal data (22222222-3333-4444-5555-666666666666)" "resolved by id alone"
+  assert_eq "1" "$(graphql_count dockerScanTools)" "no rejected field, so no retry"
   assert_eq "1" "$(graphql_count startRepositoryScan)" "the scan is started"
-  assert_not_contains "$ERR" "GraphQL request failed" "the recoverable validation error is not surfaced"
-  assert_not_contains "$ERR" "not available to tenant" "the run does not blame the caller's input for a schema change"
+  assert_not_contains "$ERR" "GraphQL request failed" "nothing the gateway could reject was requested"
+  assert_not_contains "$ERR" "not available to tenant" "the run does not blame the caller's input"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
-#       Scenario: A name is requested from a gateway that resolves only ids
-test_a_name_against_a_gateway_without_name_says_ids_are_required() {
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
+#       Scenario: A name is requested
+# `scan-tools: AEGIS` used to succeed silently, because the gateway returned a
+# name to match it against. It does not, so a name cannot resolve at all, and
+# the failure has to say that rather than blame the tenant's availability. It is
+# rejected before the catalogue is fetched, so the wording does not depend on
+# which gateway answers, and a typo costs no request.
+test_a_name_valued_scan_tools_says_ids_are_required() {
   env_set "INPUT_SCAN-TOOLS" "AEGIS"
-  fixture dockerScanTools.1.json <<'J'
-{"errors":[{"message":"Cannot query field \"name\" on type \"DockerScanTool\".","extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
-J
-  fixture dockerScanTools.json <<'J'
-{"data":{"dockerScanTools":{"items":[
-  {"id": "11111111-2222-3333-4444-555555555555", "categories": ["sca"]}
-]}}}
-J
   run_action
-  assert_failure "a name that can no longer be resolved must fail the run"
-  assert_contains "$ERR" "::error::scan tool 'AEGIS' is not a scan tool id, and this Vulnara gateway no longer resolves scan tools by name." \
-    "the failure says what actually went wrong"
+  assert_eq "0" "$(graphql_count dockerScanTools)" "a non-id entry is rejected without asking the gateway"
+  assert_failure "a name can no longer be resolved, so it must fail the run"
+  assert_contains "$ERR" "::error::scan tool 'AEGIS' is not a scan tool id." \
+    "the failure names the entry and says what is wrong with it"
+  assert_contains "$ERR" "does not resolve scanners by name" \
+    "it says the cause is the gateway no longer resolving names"
   assert_contains "$ERR" "https://app.example.test" "points at the Vulnara application for the id"
+  assert_not_contains "$ERR" "is not available to tenant" "it does not blame the tenant's availability"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
+#       Scenario: A category label is requested
+# A customer reads category labels in the product, so `scan-tools: secrets` is a
+# plausible mistake. It is not accepted: a category scan is one request that
+# fans out server-side, not N of these, so the message says where a category
+# belongs instead of failing as an unknown tool.
+test_a_category_valued_scan_tools_is_told_where_a_category_belongs() {
+  env_set "INPUT_SCAN-TOOLS" "secrets"
+  run_action
+  assert_failure "a category label is not a scan tool id"
+  assert_contains "$ERR" "::error::scan tool 'secrets' is not a scan tool id." "names the entry"
+  assert_contains "$ERR" "a category label belongs to a category scan rather than to scan-tools" \
+    "says where a category belongs"
   assert_not_contains "$ERR" "is not available to tenant" "it does not blame the tenant's availability"
   assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
 }
@@ -410,7 +441,7 @@ J
   assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
 }
 
-# spec: scan-orchestration / Requirement: Resolve the requested scan tools /
+# spec: scan-orchestration / Requirement: Resolve the requested scan tools by id /
 #       Scenario: No usable tool entries
 test_only_separators_yields_no_scan_tools() {
   env_set "INPUT_SCAN-TOOLS" " , ,  "
@@ -424,7 +455,7 @@ test_only_separators_yields_no_scan_tools() {
 # spec: scan-orchestration / Requirement: Start one scan per tool /
 #       Scenario: Scans started
 test_scans_are_started_per_tool_with_the_resolved_input() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_CREATE-ISSUE" "true"
   env_set "INPUT_AUTO-REMEDIATE" "true"
   run_action
