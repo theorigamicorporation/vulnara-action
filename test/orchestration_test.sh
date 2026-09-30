@@ -176,6 +176,106 @@ J
   assert_info "URL" "https://dev.azure.com/acme/web/_git/widgets" "project and _git segment"
 }
 
+azure_item() {
+  printf '{"id":"%s","repositoryName":"%s","private":false,"enabled":true,"programmingLanguage":[],"cloneUrl":null,"gitEntity":{"__typename":"Organization","name":"%s","gitType":"azure_devops","htmlUrl":"https://dev.azure.com/%s"}}' "$1" "$2" "$3" "$3"
+}
+
+# spec: scan-orchestration / Requirement: Match Azure DevOps repositories by project /
+#       Scenario: Azure repository matched by organization, project and name
+test_azure_repository_is_matched_by_org_project_and_name() {
+  env_set "INPUT_REPOSITORY" "acme/web/widgets"
+  fixture repositories.1.json <<'J'
+{"data":{"repositories":{"total":0,"items":[]}}}
+J
+  fixture repositories.json <<J
+{"data":{"repositories":{"total":3,"items":[
+  $(azure_item repo-web web/widgets acme),
+  $(azure_item repo-api api/widgets acme),
+  $(azure_item repo-other web/widgets other)
+]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-web" "org, project and repo pick one repository"
+  assert_info "Repository" "acme/web/widgets" "full name includes the project"
+  assert_contains "$(graphql_body_for repositories | tail -n1)" '"search":"widgets"' "searched by the short name"
+}
+
+# spec: scan-orchestration / Requirement: Match Azure DevOps repositories by project /
+#       Scenario: Azure repository matched by project and name
+test_azure_repository_is_matched_by_project_and_name() {
+  env_set "INPUT_REPOSITORY" "web/widgets"
+  fixture repositories.1.json <<'J'
+{"data":{"repositories":{"total":0,"items":[]}}}
+J
+  fixture repositories.json <<J
+{"data":{"repositories":{"total":2,"items":[
+  $(azure_item repo-web web/widgets acme),
+  $(azure_item repo-api api/widgets acme)
+]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-web" "project/repo input resolves the Azure repository"
+  assert_info "URL" "https://dev.azure.com/acme/web/_git/widgets" "browsing url"
+}
+
+# spec: scan-orchestration / Requirement: Match Azure DevOps repositories by project /
+#       Scenario: Same repository name in two Azure projects
+test_azure_short_name_in_two_projects_fails_as_ambiguous() {
+  fixture repositories.1.json <<'J'
+{"data":{"repositories":{"total":0,"items":[]}}}
+J
+  fixture repositories.json <<J
+{"data":{"repositories":{"total":2,"items":[
+  $(azure_item repo-web web/widgets acme),
+  $(azure_item repo-api api/widgets acme)
+]}}}
+J
+  run_action
+  assert_failure "two Azure candidates must not be guessed between"
+  assert_contains "$ERR" "repository 'acme/widgets' is ambiguous in Vulnara (tenant 'tenant-abc'): acme/web/widgets, acme/api/widgets" "ambiguity message"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan was started"
+}
+
+# spec: scan-orchestration / Requirement: Match Azure DevOps repositories by project /
+#       Scenario: Other providers are not matched by the Azure rule
+test_github_resolution_is_unchanged_by_the_azure_rule() {
+  fixture repositories.1.json <<J
+{"data":{"repositories":{"total":1,"items":[
+  {"id":"repo-1111","repositoryName":"widgets","private":false,"enabled":true,
+   "programmingLanguage":[],"cloneUrl":null,
+   "gitEntity":{"__typename":"Organization","name":"acme","gitType":"github","htmlUrl":"https://git.example.test/acme"}}
+]}}}
+J
+  fixture repositories.json <<J
+{"data":{"repositories":{"total":1,"items":[$(azure_item repo-azure web/widgets acme)]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-1111" "owner match still wins"
+  assert_eq "1" "$(graphql_count repositories)" "no Azure lookup after an owner match"
+}
+
+# spec: scan-orchestration / Requirement: Match Azure DevOps repositories by project /
+#       Scenario: Other providers are not matched by the Azure rule
+test_non_azure_search_results_are_not_matched() {
+  env_set "INPUT_REPOSITORY" "acme/widgets"
+  fixture repositories.1.json <<'J'
+{"data":{"repositories":{"total":0,"items":[]}}}
+J
+  fixture repositories.json <<'J'
+{"data":{"repositories":{"total":1,"items":[
+  {"id":"repo-gl","repositoryName":"tools/widgets","private":false,"enabled":true,
+   "programmingLanguage":[],"cloneUrl":null,
+   "gitEntity":{"__typename":"Organization","name":"acme","gitType":"gitlab","htmlUrl":"https://git.example.test/acme"}}
+]}}}
+J
+  run_action
+  assert_failure "a non-Azure search hit is not a match"
+  assert_contains "$ERR" "repository 'acme/widgets' was not found in Vulnara" "not-found message"
+}
+
 # spec: scan-orchestration / Requirement: Build a browsing URL for every provider /
 #       Scenario: Clone URL carries credentials
 test_clone_url_fallback_drops_credentials() {
