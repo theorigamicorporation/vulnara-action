@@ -95,14 +95,24 @@ ensure_jwt() {
 JWT_TTL=0
 
 # --- gql: run a request body, echo .data, fail on .errors -----------------
-gql() {
+# gql_post is the transport and returns the whole response, errors included, so
+# a caller that can recover from a specific error can inspect it. Everything
+# that cannot recover uses gql and aborts.
+gql_post() {
   ensure_jwt
-  local resp
-  resp="$(curl -sS "$GATEWAY_URL" \
+  curl -sS "$GATEWAY_URL" \
     -H "Authorization: Bearer $JWT" -H "X-Tenant: $TENANT" \
-    -H 'Content-Type: application/json' --data "$1")"
+    -H 'Content-Type: application/json' --data "$1"
+}
+
+gql_errors() {
+  echo "$1" | jq -r '.errors[] | "  \(.extensions.code // "ERROR"): \(.message)"' >&2
+}
+
+gql() {
+  local resp; resp="$(gql_post "$1")"
   if echo "$resp" | jq -e '.errors' >/dev/null 2>&1; then
-    echo "$resp" | jq -r '.errors[] | "  \(.extensions.code // "ERROR"): \(.message)"' >&2
+    gql_errors "$resp"
     fail "GraphQL request failed"
   fi
   echo "$resp" | jq '.data'
@@ -163,33 +173,126 @@ resolve_repository() {
   fi
 }
 
-# --- scanner display name (mirrors the app's scanImages.<name>.title map) ---
-scanner_display() {
-  case "$1" in
-    AEGIS|aegis) printf 'Ripley' ;;
-    pdd) printf 'Bishop' ;;
-    trivy) printf 'Hicks' ;;
-    secret_scanner) printf 'Ash' ;;
-    SECRET_SCANNER|"Secret Scanner") printf 'Secret Scanner' ;;
-    personal_data_scanner|PERSONAL_DATA_SCANNER|"Personal Data Scanner")
-      printf 'Personal Data Scanner' ;;
-    *) printf '%s' "$1" ;;
+# A tool id is a UUID. Used only to tell "you passed an id we do not have" from
+# "you passed a name and names are gone", so the failure says which it was.
+looks_like_id() {
+  [[ "${1:-}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]
+}
+
+# --- category display names (the shared vocabulary, not a scanner) ---------
+# A scan is labelled by what it looks for, never by what runs it. The codenames
+# this used to map, and the stored names behind them, are retired from every
+# customer surface, and a workflow log on a public repository is one of those.
+# The fallback is `Uncategorised`: display only. It is never stored, never
+# filtered on, and is not a category the platform knows about.
+category_display() {
+  case "$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    sast)    printf 'Code analysis' ;;
+    sca)     printf 'Dependencies' ;;
+    secrets) printf 'Secrets' ;;
+    pii)     printf 'Personal data' ;;
+    *)       printf 'Uncategorised' ;;
   esac
 }
 
-# --- resolve scan tools (by name or id); echo "id<TAB>name" per line -------
+# A scanner serves one or more categories, so the label for a scan is the set of
+# categories its scanner covers. Two categories that render to the same label
+# collapse to one: "Secrets, Secrets" is a leak of how many scanners ran.
+categories_display() { # comma-separated wire values -> display label
+  local out="" seen="" c d
+  IFS=',' read -ra _cats <<< "${1:-}"
+  for c in "${_cats[@]:-}"; do
+    [ -n "$c" ] || continue
+    d="$(category_display "$c")"
+    case ",$seen," in *",$d,"*) continue ;; esac
+    seen="${seen:+$seen,}$d"
+    out="${out:+$out, }$d"
+  done
+  [ -n "$out" ] || out="$(category_display "")"
+  printf '%s' "$out"
+}
+
+# --- fetch the scan tool catalogue ----------------------------------------
+# `DockerScanTool.name` is not selected, and not optional: it is gone from the
+# gateway, and asking for it would fail the whole query with
+# GRAPHQL_VALIDATION_FAILED before any id was matched. Nothing here would print
+# it if it came back, either, so there is no version of this action that wants a
+# scanner name.
+#
+# `.categories` is still narrowable. `gateway-url` is an action input, so a
+# non-prod or self-hosted gateway predating that field is a real deployment, and
+# selecting it unconditionally would turn "labelled Uncategorised" into "the run
+# fails and starts no scan" for a tool id pinned in a workflow file we do not
+# control. Narrow the selection from the validation error and retry instead.
+_TOOL_OPTIONAL_FIELDS="categories"
+scan_tool_catalogue() {
+  local optional="$_TOOL_OPTIONAL_FIELDS" sel resp keep f attempt=0
+  while :; do
+    attempt=$(( attempt + 1 ))
+    sel="id${optional:+ $optional}"
+    resp="$(gql_post "$(jq -n --arg q "{dockerScanTools(list:{}){items{$sel}}}" '{query:$q}')")"
+    if ! echo "$resp" | jq -e '.errors' >/dev/null 2>&1; then
+      echo "$resp" | jq '.data'
+      return 0
+    fi
+    keep=""
+    for f in $optional; do
+      if echo "$resp" | jq -e --arg f "$f" \
+        '[.errors[].message] | any(test("Cannot query field \"" + $f + "\""))' >/dev/null 2>&1; then
+        continue
+      fi
+      keep="${keep:+$keep }$f"
+    done
+    # Only a rejected optional field is recoverable. Anything else is a real
+    # error and has to surface with the gateway's own wording.
+    if [ "$keep" = "$optional" ] || [ "$attempt" -ge 3 ]; then
+      gql_errors "$resp"
+      fail "GraphQL request failed"
+    fi
+    optional="$keep"
+  done
+}
+
+# --- resolve scan tools, by id --------------------------------------------
+# Echoes "id<TAB>category label" per line. No scanner identity enters this
+# function, let alone leaves it: the catalogue carries ids and categories, and
+# the caller is handed a category label and has nothing else it could print.
+#
+# `scan-tools` takes ids only. It used to accept a stored name as well, which
+# worked because the gateway returned one; it does not, so a name cannot be
+# matched against anything and the failure has to say that rather than blame the
+# tenant's availability. A category label is not accepted here either: a
+# category scan is one request that fans out server-side, which is
+# startRepositoryCategoryScan, not N of these.
+# Where a tool id comes from. The Vulnara application has no screen listing
+# scanner ids, so the hint names the two places that do: vulnara-cli's
+# docker_scan_tools command and the dockerScanTools query it runs. Both list ids
+# and categories only, never a scanner's name.
+TOOL_ID_HINT="List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those."
 resolve_tools() {
-  local data; data="$(gql '{"query":"{dockerScanTools(list:{}){items{id name}}}"}')"
-  local found=0
+  local raw t found=0
   IFS=',' read -ra wanted <<< "$SCAN_TOOLS"
+  # Shape first, and before the catalogue is fetched: whether an entry is an id
+  # is knowable without asking the gateway, and a typo should not cost a request
+  # or borrow the catalogue's wording.
   for raw in "${wanted[@]}"; do
-    local t; t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
+    t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
+    [ -n "$t" ] || continue
+    looks_like_id "$t" && continue
+    fail "scan tool '$t' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. $TOOL_ID_HINT"
+  done
+  local data; data="$(scan_tool_catalogue)"
+  for raw in "${wanted[@]}"; do
+    t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
     [ -n "$t" ] || continue
     local pair
     pair="$(echo "$data" | jq -r --arg t "$t" \
-      '[.dockerScanTools.items[] | select(.id == $t or (.name | ascii_downcase) == ($t | ascii_downcase))][0] | select(.) | "\(.id)\t\(.name)"')"
-    [ -n "$pair" ] || fail "scan tool '$t' not found. Available: $(echo "$data" | jq -r '[.dockerScanTools.items[].name] | join(", ")')"
-    echo "$pair"
+      '[.dockerScanTools.items[] | select(.id == $t)][0]
+       | select(.) | "\(.id)\t\((.categories // []) | join(","))"')"
+    if [ -z "$pair" ]; then
+      fail "scan tool '$t' is not available to tenant '$TENANT'. $TOOL_ID_HINT"
+    fi
+    printf '%s\t%s\n' "${pair%%$'\t'*}" "$(categories_display "${pair#*$'\t'}")"
     found=1
   done
   [ "$found" -eq 1 ] || fail "no scan tools provided"
@@ -263,28 +366,27 @@ ok "resolved '$REPO_FULLNAME'"
 
 # --- [3/5] resolve scan tools ----------------------------------------------
 step 3 "Resolve scan tools"
-declare -a TOOL_IDS=() TOOL_NAMES=()
+declare -a TOOL_IDS=() TOOL_CATEGORIES=()
 # resolve_tools is captured into a variable rather than consumed through a process
 # substitution: a `fail` inside `< <(...)` would only kill the subshell and let the
 # run continue with an empty tool list and exit 0.
 TOOL_LIST="$(resolve_tools)" || exit 1
-while IFS=$'\t' read -r tid tname; do
+while IFS=$'\t' read -r tid tlabel; do
   [ -n "$tid" ] || continue
-  TOOL_IDS+=("$tid"); TOOL_NAMES+=("$tname")
-  info "tool" "$tname ($tid)"
+  TOOL_IDS+=("$tid"); TOOL_CATEGORIES+=("$tlabel")
+  info "category" "$tlabel ($tid)"
 done <<< "$TOOL_LIST"
 ok "${#TOOL_IDS[@]} scan tool(s) selected"
 
 # --- [4/5] start + wait for scans ------------------------------------------
 step 4 "Run scans on branch '$BRANCH'"
-declare -a SCANS=() SCAN_LABELS=() SCAN_DURATIONS=()
+declare -a SCANS=() SCAN_CATEGORIES=() SCAN_DURATIONS=()
 SCAN_IDS=""
 for i in "${!TOOL_IDS[@]}"; do
-  tname="${TOOL_NAMES[$i]}"
-  label="$(scanner_display "$tname")"
+  label="${TOOL_CATEGORIES[$i]}"
   srid="$(start_scan "${TOOL_IDS[$i]}")"
   [ -n "$srid" ] || fail "scan did not return a scan result id (tool '$label')"
-  SCANS+=("$srid"); SCAN_LABELS+=("$label")
+  SCANS+=("$srid"); SCAN_CATEGORIES+=("$label")
   SCAN_IDS="$SCAN_IDS $srid"
   ok "started '$label' -> scan $srid"
 done
@@ -292,9 +394,9 @@ SCAN_IDS="$(echo "$SCAN_IDS" | sed 's/^ *//')"
 
 log "waiting for ${#SCANS[@]} scan(s) to finish (timeout ${WAIT_TIMEOUT}s, polling every ${POLL_INTERVAL}s)"
 for i in "${!SCANS[@]}"; do
-  dur="$(wait_scan "${SCANS[$i]}" "${SCAN_LABELS[$i]}")"
+  dur="$(wait_scan "${SCANS[$i]}" "${SCAN_CATEGORIES[$i]}")"
   SCAN_DURATIONS+=("$dur")
-  ok "${SCAN_LABELS[$i]} completed in ${dur}s"
+  ok "${SCAN_CATEGORIES[$i]} completed in ${dur}s"
 done
 
 # --- [5/5] collect findings + gate -----------------------------------------
@@ -332,14 +434,14 @@ info "Low" "${SEV_TOTAL[LOW]}"
 info "Total" "$TOTAL"
 info "Highest" "$HIGHEST_LABEL"
 for i in "${!SCANS[@]}"; do
-  info "view scan" "${SCAN_LABELS[$i]}: ${APP_URL}/repository-scans/${SCANS[$i]}"
+  info "view scan" "${SCAN_CATEGORIES[$i]}: ${APP_URL}/repository-scans/${SCANS[$i]}"
 done
 
-# combine all findings, tagging each with its tool, for the detailed table
+# combine all findings, tagging each with its scan's category, for the table
 ALL_ITEMS="[]"
 for i in "${!SCANS[@]}"; do
-  ALL_ITEMS="$(jq -c --argjson acc "$ALL_ITEMS" --arg tool "${SCAN_LABELS[$i]}" \
-    '$acc + (map(. + {tool:$tool}))' <<<"${SCAN_ITEMS[$i]}")"
+  ALL_ITEMS="$(jq -c --argjson acc "$ALL_ITEMS" --arg category "${SCAN_CATEGORIES[$i]}" \
+    '$acc + (map(. + {category:$category}))' <<<"${SCAN_ITEMS[$i]}")"
 done
 
 # --- outputs ---------------------------------------------------------------
@@ -377,17 +479,17 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo ""
     echo "### Scans"
     echo ""
-    echo "| Tool | Duration | Findings | View in Vulnara |"
+    echo "| Category | Duration | Findings | View in Vulnara |"
     echo "|---|---|---|---|"
     for i in "${!SCANS[@]}"; do
-      echo "| ${SCAN_LABELS[$i]} | ${SCAN_DURATIONS[$i]:-?}s | ${SCAN_FINDINGS[$i]:-0} | [\`${SCANS[$i]:0:8}\`]($APP_URL/repository-scans/${SCANS[$i]}) |"
+      echo "| ${SCAN_CATEGORIES[$i]} | ${SCAN_DURATIONS[$i]:-?}s | ${SCAN_FINDINGS[$i]:-0} | [\`${SCANS[$i]:0:8}\`]($APP_URL/repository-scans/${SCANS[$i]}) |"
     done
     if [ "$TOTAL" -gt 0 ]; then
       echo ""
       echo "### Detailed findings"
       echo ""
       shown="$(echo "$ALL_ITEMS" | jq -r '[.[] | select((.file // "") != "")] | length')"
-      echo "| Severity | Location | Tool | Confidence |"
+      echo "| Severity | Location | Category | Confidence |"
       echo "|---|---|---|---|"
       echo "$ALL_ITEMS" | jq -r --arg base "$REPO_URL" --arg prov "$REPO_PROVIDER" --argjson limit "$FINDING_LIMIT" '
         def rank(s): (s // "" | ascii_upcase) as $u
@@ -412,7 +514,7 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         [.[] | select((.file // "") != "")]
         | sort_by(-rank(.severity))
         | .[:$limit]
-        | .[] | "| " + sevlabel(.severity) + " | " + loc + " | " + (.tool // "-") + " | " + (.confidence // "-") + " |"'
+        | .[] | "| " + sevlabel(.severity) + " | " + loc + " | " + (.category // "-") + " | " + (.confidence // "-") + " |"'
       if [ "$shown" -gt "$FINDING_LIMIT" ]; then
         echo ""
         echo "_Showing the top $FINDING_LIMIT of $shown located findings. Open the scans above to see all._"

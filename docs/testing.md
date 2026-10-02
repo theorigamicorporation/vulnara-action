@@ -45,7 +45,8 @@ Point a workflow at your branch and override the environment, as described in
 | Findings below `fail-on` | Job passes, summary lists the findings |
 | Findings at or above `fail-on` | Job fails with `scan gate failed`, `passed=false` |
 | Two scanners at once | Two scan ids in `scan-result-ids`, two rows in the summary |
-| An unknown tool name | Job fails with `scan tool '<name>' not found.` and the available list, before any scan starts |
+| A scanner name instead of an id | Job fails with `scan tool '<entry>' is not a scan tool id.` and no roster, before any request is made |
+| An unknown tool id | Job fails with `scan tool '<id>' is not available to tenant '<tenant>'.` and no roster, before any scan starts |
 
 ## What a test has to satisfy
 

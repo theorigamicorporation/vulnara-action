@@ -12,7 +12,7 @@ the outputs it writes.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a GitHub Actions secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id, sent as the `X-Tenant` header on every request. |
-| `scan-tools` | yes | | Comma-separated scanner names or ids. See [Reference](reference.md#scanners). |
+| `scan-tools` | yes | | Comma-separated scan tool ids. See [Reference](reference.md#scanners). |
 | `branch` | no | `GITHUB_REF_NAME` | Branch to scan. |
 | `repository` | no | `GITHUB_REPOSITORY` | `owner/name` to resolve in Vulnara. Azure DevOps also takes `org/project/repo` or `project/repo`. See [Reference](reference.md#resolving-the-repository). |
 | `git-token-id` | no | | Vulnara git token id. Required for private repositories. |
@@ -75,7 +75,7 @@ what to do with `passed` and `highest-severity` itself:
           service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
           token: ${{ secrets.VULNARA_TOKEN }}
           tenant: my-tenant
-          scan-tools: AEGIS
+          scan-tools: 11111111-2222-3333-4444-555555555555
           fail-on: none
       - run: echo "highest severity = ${{ steps.vulnara.outputs.highest-severity }}"
 ```

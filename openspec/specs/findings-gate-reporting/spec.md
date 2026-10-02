@@ -69,14 +69,19 @@ severity or `none`, and `passed` is `true` or `false`.
 The system SHALL append a Markdown summary to the file named by `GITHUB_STEP_SUMMARY` when it
 is set, containing a pass/fail heading, a table of repository, provider, visibility, branch,
 languages, gate setting, highest severity and total duration, a severity count table, and a
-per-scan table with the tool display name, duration, finding count and a link to
-`<app-url>/repository-scans/<scan result id>`.
+per-scan table headed `Category`, carrying the category label each scan covered, its duration,
+its finding count and a link to `<app-url>/repository-scans/<scan result id>`.
 
 #### Scenario: Summary written after a scan run
 - **WHEN** the scans complete and `GITHUB_STEP_SUMMARY` is set
 - **THEN** the summary starts with `## ✅ Vulnara scan: Passed` or `## ❌ Vulnara scan: Failed`
 - **AND** the repository cell links to the repository browsing URL when one was resolved,
   and is plain code text otherwise
+
+#### Scenario: Per-scan rows carry no scanner identity
+- **WHEN** the per-scan table is rendered
+- **THEN** each row's first cell is the category label for that scan
+- **AND** no scanner name, codename or product name appears in the summary
 
 #### Scenario: Summary unavailable
 - **WHEN** `GITHUB_STEP_SUMMARY` is not set

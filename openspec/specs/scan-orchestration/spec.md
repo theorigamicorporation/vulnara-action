@@ -73,27 +73,6 @@ languages and browsing URL.
 - **WHEN** the resolved repository is private and `git-token-id` is empty
 - **THEN** the action emits a `::warning::` that cloning may fail, and continues
 
-### Requirement: Resolve the requested scan tools
-The system SHALL split the `scan-tools` input on commas, trim surrounding whitespace from
-each entry, and match each entry against the `dockerScanTools` list by exact id or
-case-insensitive name. It SHALL map internal tool names to their display codenames — `AEGIS`
-to `Ripley`, `pdd` to `Bishop`, `trivy` to `Hicks`, `secret_scanner` to `Ash` — and use the
-raw name for anything unmapped.
-
-#### Scenario: Tools resolved by name and by id
-- **WHEN** `scan-tools` is `AEGIS, 11111111-2222-3333-4444-555555555555`
-- **THEN** both entries resolve to tool ids and the action reports the number of scan tools
-  selected
-
-#### Scenario: Unknown tool requested
-- **WHEN** an entry in `scan-tools` matches no `dockerScanTools` id or name
-- **THEN** the action fails with `scan tool '<entry>' not found.` followed by the list of
-  available tool names
-
-#### Scenario: No usable tool entries
-- **WHEN** `scan-tools` contains only separators and whitespace
-- **THEN** the action fails with `no scan tools provided`
-
 ### Requirement: Start one scan per tool
 The system SHALL call the `startRepositoryScan` mutation once per resolved tool with the
 resolved repository id, the tool id, the branch, and boolean `createIssue` and
@@ -104,7 +83,7 @@ result ids.
 #### Scenario: Scans started
 - **WHEN** two tools are resolved
 - **THEN** two `startRepositoryScan` mutations are issued and each returned scan result id is
-  logged as `started '<display name>' -> scan <id>`
+  logged as `started '<category label>' -> scan <id>`
 
 #### Scenario: git-token-id omitted when unset
 - **WHEN** `git-token-id` is empty
@@ -112,7 +91,8 @@ result ids.
 
 #### Scenario: Mutation returns no scan result id
 - **WHEN** `startRepositoryScan` returns an empty scan result id for a tool
-- **THEN** the action fails with `scan did not return a scan result id` naming that tool
+- **THEN** the action fails with `scan did not return a scan result id` naming that scan's
+  category label
 
 ### Requirement: Wait for scans to finish
 The system SHALL poll the `scanResult` query for each started scan every `poll-interval`
@@ -123,16 +103,120 @@ each status transition with the elapsed time. Each scan is waited on with its ow
 #### Scenario: Scan completes successfully
 - **WHEN** a scan reaches status `SUCCESS`
 - **THEN** waiting stops for that scan and its elapsed duration is recorded and logged as
-  `<display name> completed in <n>s`
+  `<category label> completed in <n>s`
 
 #### Scenario: Scan ends in a failure state
 - **WHEN** a scan reaches status `FAILED` or `CANCELLED`
-- **THEN** the action fails with `scan for '<display name>' ended as <status> (id <scan id>)`
+- **THEN** the action fails with `scan for '<category label>' ended as <status> (id <scan id>)`
 
 #### Scenario: Scan exceeds the wait timeout
 - **WHEN** a scan has not reached a terminal status within `wait-timeout` seconds
 - **THEN** the action fails with a timeout message naming the timeout, the last observed
   status and the scan result id
+
+### Requirement: Never identify a scanner to the caller
+The action SHALL NOT write anything that identifies a scanner to the console log, to a GitHub
+annotation, to the job summary or to an action output: not the stored `dockerScanTools` name, not
+a codename or product name derived from it, and not an enumeration of the catalogue. A workflow
+log is world-readable on a public repository, and what ran a scan is not a customer-facing fact.
+
+A scan SHALL be labelled by the category it covers. The labels are fixed: `sast` is
+`Code analysis`, `sca` is `Dependencies`, `secrets` is `Secrets`, `pii` is `Personal data`.
+
+A scanner serves one or more categories, so a label MAY be a set. It SHALL be joined and
+deduplicated, because two categories rendering to the same label would otherwise count the
+scanners behind them.
+
+Where no category can be resolved, the label SHALL be `Uncategorised`. That value is display
+only: it is never sent to the platform, never filtered on, and is not a category the platform
+knows about.
+
+A failure to resolve a requested tool SHALL NOT enumerate the tools that do resolve. The caller
+needs to know that what they asked for was rejected, not what else exists.
+
+#### Scenario: A scan is named in the log or the summary
+- **WHEN** any line of the console log, the job summary or an annotation refers to a scan
+- **THEN** it names the category the scan covers
+- **AND** no scanner name, codename or product name appears in that line
+
+#### Scenario: A scanner serving two categories
+- **WHEN** a resolved tool records both `sca` and `secrets`
+- **THEN** the scan is labelled `Dependencies, Secrets`
+- **AND** a tool recording the same category twice is labelled once, so the label does not
+  disclose how many scanners ran
+
+#### Scenario: A scanner whose categories cannot be resolved
+- **WHEN** a resolved tool records no category, or the gateway exposes no categories at all
+- **THEN** the scan is labelled `Uncategorised`
+- **AND** the tool's stored name appears in no log line, annotation, summary row or output
+
+### Requirement: Resolve the requested scan tools by id
+The system SHALL read the `dockerScanTools` catalogue for the tenant and resolve every entry in
+`scan-tools` to a tool id, failing the run with a message naming the rejected entry when an entry
+does not resolve. It SHALL map each matched tool to the category label it covers before the resolved
+list leaves the resolver, so that no caller holds a scanner identity to print.
+
+`scan-tools` SHALL be resolved by id only. The system SHALL reject a non-id entry before the
+catalogue is fetched, with a message that names the entry, states that this gateway does not
+resolve scanners by name, states that a category label belongs to a category scan rather than to
+`scan-tools`, and points at where the ids are listed. It SHALL NOT report a non-id entry as
+unavailable to the tenant, which sends the caller to look for a scanner that is present.
+
+Where a failure points the caller at the ids, it SHALL name vulnara-cli's `docker_scan_tools`
+command and the `dockerScanTools { id categories }` query. The Vulnara application has no screen
+listing scanner ids, so a message sending the caller there sends them nowhere.
+
+The selection set SHALL NOT include `name`. The gateway has removed `DockerScanTool.name`, so
+requesting it would fail the whole query before any id was matched, and nothing in this action would
+print the value if it came back. `categories` SHALL remain optional: when the gateway rejects it with
+a field-level validation error, the field SHALL be dropped from the selection and the query retried,
+because `gateway-url` is an input and a gateway predating that field is a real deployment, and a
+failed query would break an id pinned in a consumer's own workflow file. Any GraphQL error that is
+not a rejected optional field SHALL still abort the run.
+
+#### Scenario: Tools resolved by id
+- **WHEN** `scan-tools` names two tools by their ids
+- **THEN** both entries resolve and the action reports the number of scan tools selected
+- **AND** each resolved tool is listed under its category label alongside its id
+
+#### Scenario: The catalogue query requests no scanner name
+- **WHEN** the action reads the `dockerScanTools` catalogue
+- **THEN** the request body selects no `name`, and one request is enough
+
+#### Scenario: The gateway has no categories field
+- **WHEN** the gateway answers a selection containing `categories` with a validation error naming
+  that field
+- **THEN** the query is retried without it and the run proceeds
+- **AND** every resolved tool is labelled `Uncategorised`
+
+#### Scenario: A pinned tool id resolves against the gateway that removed the name
+- **WHEN** `scan-tools` holds a tool id and the gateway no longer exposes `name`
+- **THEN** the id resolves in one request and the scan is started
+- **AND** the run reports neither a GraphQL failure nor an availability failure
+
+#### Scenario: A name is requested
+- **WHEN** an entry in `scan-tools` is a scanner's stored name rather than an id
+- **THEN** the action fails with a message stating that the entry is not a scan tool id and that
+  this gateway does not resolve scanners by name, and pointing at `vulnara docker_scan_tools` and the
+  `dockerScanTools` query for the id
+- **AND** the message does not claim the tool is unavailable to the tenant
+- **AND** no catalogue request is sent, because the entry's shape is knowable without the gateway
+
+#### Scenario: A category label is requested
+- **WHEN** an entry in `scan-tools` is a category label rather than an id
+- **THEN** the action fails with a message stating that a category label belongs to a category scan
+  rather than to `scan-tools`
+- **AND** the message does not claim the tool is unavailable to the tenant
+
+#### Scenario: Unknown tool requested
+- **WHEN** an entry in `scan-tools` is a well-formed id that matches no `dockerScanTools` id
+- **THEN** the action fails with a message naming the rejected entry and the tenant, and pointing
+  at `vulnara docker_scan_tools` and the `dockerScanTools` query for the ids the tenant may run
+- **AND** the message names no scanner the platform offers
+
+#### Scenario: No usable tool entries
+- **WHEN** `scan-tools` contains only separators and whitespace
+- **THEN** the action fails with `no scan tools provided`
 
 ### Requirement: Match Azure DevOps repositories by project
 The system SHALL resolve an Azure DevOps repository from its project and name when no item
@@ -182,4 +266,3 @@ the `cloneUrl` before using it as the browsing URL fallback.
 #### Scenario: Clone URL carries credentials
 - **WHEN** no `htmlUrl` is available and the `cloneUrl` contains `user:secret@` userinfo
 - **THEN** the browsing URL is the `cloneUrl` without the userinfo and without a trailing `.git`
-

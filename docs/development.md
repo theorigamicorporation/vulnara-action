@@ -37,7 +37,7 @@ Point a workflow at your branch and override the four environment inputs togethe
           service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
           token: ${{ secrets.VULNARA_TOKEN }}
           tenant: my-tenant
-          scan-tools: AEGIS
+          scan-tools: 11111111-2222-3333-4444-555555555555
           gateway-url: https://gateway.example.test/graphql
           app-url: https://app.example.test
           token-url: https://auth.example.test/application/o/token/

@@ -123,7 +123,7 @@ default_inputs() {
   env_set "INPUT_SERVICE-ACCOUNT" "ci-bot"
   env_set "INPUT_TOKEN"           "not-a-real-token"
   env_set "INPUT_TENANT"          "tenant-abc"
-  env_set "INPUT_SCAN-TOOLS"      "AEGIS"
+  env_set "INPUT_SCAN-TOOLS"      "11111111-2222-3333-4444-555555555555"
   env_set "INPUT_BRANCH"          "feature/x"
   env_set "INPUT_REPOSITORY"      "acme/widgets"
   env_set "INPUT_GIT-TOKEN-ID"    ""

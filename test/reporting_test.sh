@@ -43,7 +43,7 @@ use_github_files() {
 # spec: findings-gate-reporting / Requirement: Collect findings per scan /
 #       Scenario: Findings aggregated across scans
 test_findings_are_aggregated_across_scans() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_FAIL-ON" "none"
   use_github_files
   findings_fixture scanFindings.1.json CRITICAL HIGH LOW
@@ -58,8 +58,8 @@ test_findings_are_aggregated_across_scans() {
   assert_info "Highest"  "Critical" "highest severity"
   local s; s="$(summary)"
   assert_contains "$s" "| 1 | 2 | 2 | 1 | 6 |" "severity count table"
-  assert_contains "$s" "| Ripley | " "per-scan row for the first tool"
-  assert_contains "$s" "| Hicks | " "per-scan row for the second tool"
+  assert_contains "$s" "| Dependencies, Secrets | " "per-scan row for the first tool"
+  assert_contains "$s" "| Dependencies | " "per-scan row for the second tool"
   assert_contains "$(graphql_body_for scanFindings)" '"field":"scanResultId"' "findings filtered per scan result"
   assert_contains "$(graphql_body_for scanFindings)" '"stringEquals":"scan-aaaaaaaa-0001"' "first scan result id"
   assert_contains "$(graphql_body_for scanFindings)" '"stringEquals":"scan-bbbbbbbb-0002"' "second scan result id"
@@ -68,7 +68,7 @@ test_findings_are_aggregated_across_scans() {
 # spec: findings-gate-reporting / Requirement: Collect findings per scan /
 #       Scenario: Scan with no findings
 test_scan_without_findings_contributes_nothing() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_FAIL-ON" "none"
   use_github_files
   findings_fixture scanFindings.1.json HIGH
@@ -79,7 +79,7 @@ J
   assert_success
   assert_info "Total" "1" "only the first scan contributed"
   local s; s="$(summary)"
-  assert_contains "$s" "| Hicks | 0s | 0 |" "empty scan reports zero findings"
+  assert_contains "$s" "| Dependencies | 0s | 0 |" "empty scan reports zero findings"
 }
 
 # spec: findings-gate-reporting / Requirement: Collect findings per scan /
@@ -174,7 +174,7 @@ test_lowest_threshold_fails_on_a_low_finding() {
 # spec: findings-gate-reporting / Requirement: Publish action outputs /
 #       Scenario: Outputs written for a failing gate
 test_outputs_are_written_before_a_failing_exit() {
-  env_set "INPUT_SCAN-TOOLS" "AEGIS,trivy"
+  env_set "INPUT_SCAN-TOOLS" "11111111-2222-3333-4444-555555555555,33333333-4444-5555-6666-777777777777"
   env_set "INPUT_FAIL-ON" "critical"
   use_github_files
   findings_fixture scanFindings.1.json CRITICAL
@@ -288,7 +288,7 @@ test_located_findings_link_to_the_scanned_commit() {
   assert_success
   local s; s="$(summary)"
   assert_contains "$s" "### Detailed findings" "detailed section"
-  assert_contains "$s" "| High | [\`src/app-0.go:10\`](https://git.example.test/acme/widgets/blob/0123456789abcdef0123456789abcdef01234567/src/app-0.go#L10) | Ripley | HIGH |" \
+  assert_contains "$s" "| High | [\`src/app-0.go:10\`](https://git.example.test/acme/widgets/blob/0123456789abcdef0123456789abcdef01234567/src/app-0.go#L10) | Dependencies, Secrets | HIGH |" \
     "linked location, tool and confidence"
 }
 
@@ -375,7 +375,7 @@ J
   run_action
   assert_success
   local s; s="$(summary)"
-  assert_contains "$s" "| High | src/app.go:42 | Ripley | MEDIUM |" "plain location text"
+  assert_contains "$s" "| High | src/app.go:42 | Dependencies, Secrets | MEDIUM |" "plain location text"
   assert_not_contains "$s" "/blob/" "no blob link without a commit hash"
 }
 
@@ -394,7 +394,7 @@ J
   findings_fixture scanFindings.json HIGH
   run_action
   assert_success
-  assert_contains "$(summary)" "| High | src/app-0.go:10 | Ripley | HIGH |" "plain location text"
+  assert_contains "$(summary)" "| High | src/app-0.go:10 | Dependencies, Secrets | HIGH |" "plain location text"
 }
 
 # spec: findings-gate-reporting / Requirement: Link findings to source lines
@@ -412,7 +412,7 @@ J
   local s; s="$(summary)"
   assert_contains "$s" "[\`src/app.go\`](https://git.example.test/acme/widgets/blob/abcdef1234567890abcdef1234567890abcdef12/src/app.go)" \
     "no #L fragment"
-  assert_contains "$s" "| Ripley | - |" "missing confidence rendered as a dash"
+  assert_contains "$s" "| Dependencies, Secrets | - |" "missing confidence rendered as a dash"
 }
 
 # spec: findings-gate-reporting / Requirement: Link findings to source lines /
