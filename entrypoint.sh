@@ -264,6 +264,11 @@ scan_tool_catalogue() {
 # tenant's availability. A category label is not accepted here either: a
 # category scan is one request that fans out server-side, which is
 # startRepositoryCategoryScan, not N of these.
+# Where a tool id comes from. The Vulnara application has no screen listing
+# scanner ids, so the hint names the two places that do: vulnara-cli's
+# docker_scan_tools command and the dockerScanTools query it runs. Both list ids
+# and categories only, never a scanner's name.
+TOOL_ID_HINT="List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those."
 resolve_tools() {
   local raw t found=0
   IFS=',' read -ra wanted <<< "$SCAN_TOOLS"
@@ -274,7 +279,7 @@ resolve_tools() {
     t="$(echo "$raw" | sed 's/^ *//;s/ *$//')"
     [ -n "$t" ] || continue
     looks_like_id "$t" && continue
-    fail "scan tool '$t' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. Open $APP_URL, copy the id shown against the scanner you want, and use that."
+    fail "scan tool '$t' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. $TOOL_ID_HINT"
   done
   local data; data="$(scan_tool_catalogue)"
   for raw in "${wanted[@]}"; do
@@ -285,7 +290,7 @@ resolve_tools() {
       '[.dockerScanTools.items[] | select(.id == $t)][0]
        | select(.) | "\(.id)\t\((.categories // []) | join(","))"')"
     if [ -z "$pair" ]; then
-      fail "scan tool '$t' is not available to tenant '$TENANT'. Open $APP_URL to see the scanners this workspace can run, and pass the id shown there."
+      fail "scan tool '$t' is not available to tenant '$TENANT'. $TOOL_ID_HINT"
     fi
     printf '%s\t%s\n' "${pair%%$'\t'*}" "$(categories_display "${pair#*$'\t'}")"
     found=1

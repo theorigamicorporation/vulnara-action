@@ -42,24 +42,33 @@ Three limits worth knowing:
 - The gate reads `scanFindings` only, which are code and secret findings. Dependency and
   network findings are not consulted, so they cannot fail the build today.
 - A scan ending `FAILED` or `CANCELLED` fails the job on its own, before any findings are read.
-- A tool-resolution failure aborts the run before any scan is started, so a name typo fails the
+- A tool-resolution failure aborts the run before any scan is started, so an id typo fails the
   job rather than passing it with nothing scanned.
 
 ## Scanners
 
-`scan-tools` accepts a tool id from Vulnara's `dockerScanTools`. Comma-separate for several, and
-surrounding whitespace is trimmed. Ids are listed against each scanner in the Vulnara
-application. **Pass ids.** A tool name is still matched, case-insensitively, while the gateway
-still returns one, but scanner names are being removed from every customer-facing part of the
-API, and a `scan-tools` entry that names one stops resolving on the day that lands.
+`scan-tools` takes scanner ids only, from Vulnara's `dockerScanTools`. Comma-separate for
+several, and surrounding whitespace is trimmed. A scanner name is not accepted: the gateway no
+longer returns names, so there is nothing to match one against, and an entry that is not an id
+fails the run before any request is made.
 
-The action tolerates that removal rather than breaking on it. The `dockerScanTools` selection set
-is assembled from the fields the schema actually has: a field the gateway has dropped is
-identified from the validation error and dropped from the query, then the query is retried.
-Selecting it unconditionally would fail the whole query, so a run that passed an id would break
-exactly as hard as one that passed a name, and the annotation would blame the workflow's input
-for a change made on the platform side. Any GraphQL error that is not a rejected optional field
-still aborts the run with the gateway's own wording.
+To find the ids your workspace can run, use the Vulnara CLI, which lists each scanner's id and
+categories and never its name:
+
+```sh
+vulnara docker_scan_tools
+```
+
+or run the same GraphQL query against the gateway yourself:
+
+```graphql
+{ dockerScanTools { items { id categories } } }
+```
+
+The action selects only `id` and `categories` from `dockerScanTools`. `categories` is optional: a
+gateway that predates the field rejects it with a validation error, the field is dropped and the
+query retried, and every scan is then labelled `Uncategorised`. Any GraphQL error that is not that
+rejected field still aborts the run with the gateway's own wording.
 
 Nothing the action prints identifies a scanner. A scan is labelled by the **category** it covers,
 which is what the scan looked for rather than what ran it:
@@ -77,13 +86,13 @@ label counts scanners. When no category can be resolved — a gateway that does 
 `categories`, or a tool with none recorded — the label is `Uncategorised`. That is display only:
 it is never sent to the platform and is not a category the platform knows about.
 
-An entry matching no id, and no name while names still resolve, aborts the run before any scan
-starts. The failure names what you passed and where to look the right value up, and deliberately
-does not list the scanners that would have worked — a CI log is world-readable on a public
-repository, and a typo should not hand a reader the roster:
+An entry matching no id aborts the run before any scan starts. The failure names what you passed
+and where to look the right value up, and deliberately does not list the scanners that would have
+worked — a CI log is world-readable on a public repository, and a typo should not hand a reader the
+roster:
 
 ```
-scan tool 'nosuchtool' is not available to tenant 'acme'. Open https://vulnara.rso.dev to see the scanners this workspace can run, and pass the id shown there.
+scan tool '00000000-0000-0000-0000-000000000000' is not available to tenant 'acme'. List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those.
 ```
 
 An entry that is not an id says so instead of blaming the tenant's scanner availability.
@@ -91,7 +100,7 @@ An entry that is not an id says so instead of blaming the tenant's scanner avail
 label belongs to a category scan rather than to this input:
 
 ```
-scan tool 'AEGIS' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. Open https://vulnara.rso.dev, copy the id shown against the scanner you want, and use that.
+scan tool 'my-scanner' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those.
 ```
 
 ## Resolving the repository

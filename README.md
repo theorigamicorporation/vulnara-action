@@ -45,7 +45,8 @@ Five numbered steps, each printed to the log with a `vulnara:` prefix.
    not fail.
 2. **Resolve the repository.** Looked up by name in Vulnara and matched on the owner half of
    `repository`. Warns if the repository is disabled, or private with no `git-token-id`.
-3. **Resolve the scanners.** Each entry in `scan-tools` is matched against a tool id or name.
+3. **Resolve the scanners.** Each entry in `scan-tools` is matched against a tool id. Names
+   are not accepted.
 4. **Start and await the scans.** One scan per scanner, all started up front, then polled every
    `poll-interval` seconds until each reaches a terminal state.
 5. **Evaluate the findings.** Counted per severity, rendered into the job summary, written to
@@ -129,7 +130,7 @@ jobs:
           service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
           token: ${{ secrets.VULNARA_TOKEN }}
           tenant: my-tenant
-          scan-tools: 11111111-2222-3333-4444-555555555555   # the id shown in Vulnara; comma-separate for several
+          scan-tools: 11111111-2222-3333-4444-555555555555   # from `vulnara docker_scan_tools`; comma-separate for several
           fail-on: high             # fail the build on High or Critical findings
           # branch defaults to the branch that triggered the workflow
           # git-token-id: <id>      # required for private repositories
@@ -149,7 +150,7 @@ before adding a second scanner.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id. |
-| `scan-tools` | yes | | Comma-separated scan tool ids. Names still resolve while the gateway returns them. |
+| `scan-tools` | yes | | Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. |
 | `branch` | no | triggering branch | Branch to scan. |
 | `repository` | no | current repo | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repositories). |

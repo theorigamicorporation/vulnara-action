@@ -159,8 +159,12 @@ list leaves the resolver, so that no caller holds a scanner identity to print.
 `scan-tools` SHALL be resolved by id only. The system SHALL reject a non-id entry before the
 catalogue is fetched, with a message that names the entry, states that this gateway does not
 resolve scanners by name, states that a category label belongs to a category scan rather than to
-`scan-tools`, and points at the Vulnara application for the id. It SHALL NOT report a non-id entry as
+`scan-tools`, and points at where the ids are listed. It SHALL NOT report a non-id entry as
 unavailable to the tenant, which sends the caller to look for a scanner that is present.
+
+Where a failure points the caller at the ids, it SHALL name vulnara-cli's `docker_scan_tools`
+command and the `dockerScanTools { id categories }` query. The Vulnara application has no screen
+listing scanner ids, so a message sending the caller there sends them nowhere.
 
 The selection set SHALL NOT include `name`. The gateway has removed `DockerScanTool.name`, so
 requesting it would fail the whole query before any id was matched, and nothing in this action would
@@ -193,7 +197,8 @@ not a rejected optional field SHALL still abort the run.
 #### Scenario: A name is requested
 - **WHEN** an entry in `scan-tools` is a scanner's stored name rather than an id
 - **THEN** the action fails with a message stating that the entry is not a scan tool id and that
-  this gateway does not resolve scanners by name, and pointing at the Vulnara application for the id
+  this gateway does not resolve scanners by name, and pointing at `vulnara docker_scan_tools` and the
+  `dockerScanTools` query for the id
 - **AND** the message does not claim the tool is unavailable to the tenant
 - **AND** no catalogue request is sent, because the entry's shape is knowable without the gateway
 
@@ -206,7 +211,7 @@ not a rejected optional field SHALL still abort the run.
 #### Scenario: Unknown tool requested
 - **WHEN** an entry in `scan-tools` is a well-formed id that matches no `dockerScanTools` id
 - **THEN** the action fails with a message naming the rejected entry and the tenant, and pointing
-  at the Vulnara application for the scanners the tenant may run
+  at `vulnara docker_scan_tools` and the `dockerScanTools` query for the ids the tenant may run
 - **AND** the message names no scanner the platform offers
 
 #### Scenario: No usable tool entries

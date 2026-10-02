@@ -70,7 +70,7 @@ sequenceDiagram
     A->>G: 2. repositories(filter repositoryName)
     G-->>A: candidates, matched on owner
     A->>G: 3. dockerScanTools
-    G-->>A: id and name per tool
+    G-->>A: id and categories per tool
     loop per scanner
         A->>G: 4a. startRepositoryScan(repo, tool, branch)
         G-->>A: scanResult id
@@ -96,7 +96,7 @@ sequenceDiagram
    `git-token-id`. See [the resolution caveat](troubleshooting.md#the-wrong-repository-is-scanned).
 3. **Resolve the scanners.** `dockerScanTools` is queried once, with its selection set narrowed
    to the fields the schema actually has, and each entry in `scan-tools` is matched against a
-   tool id, or against a tool name while the gateway still returns one. An unknown entry aborts
+   tool id; names are not accepted. An unknown entry aborts
    the run before any scan is started; the failure names the entry that was rejected, never the
    scanners that would have resolved. Each resolved tool is carried onward as the **category** it
    covers, so no scanner identity is available to print.

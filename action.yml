@@ -16,7 +16,7 @@ inputs:
     description: 'Vulnara tenant (workspace) id the service account belongs to.'
     required: true
   scan-tools:
-    description: 'Comma-separated scan tool ids to run, as listed against each scanner in Vulnara. Names are not accepted.'
+    description: 'Comma-separated scan tool ids to run. Names are not accepted. List the ids with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`.'
     required: true
   branch:
     description: 'Branch to scan. Defaults to the branch that triggered the workflow.'
