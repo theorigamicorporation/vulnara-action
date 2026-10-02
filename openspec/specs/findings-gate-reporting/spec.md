@@ -6,9 +6,7 @@ result, aggregating them by severity, deciding whether the build passes the `fai
 publishing the action outputs, and rendering the GitHub job summary with links back into the
 Vulnara platform and to the offending lines of code. This is the part of the action that CI
 users see and that determines whether the job succeeds or fails.
-
 ## Requirements
-
 ### Requirement: Collect findings per scan
 The system SHALL query `scanFindings` filtered by `scanResultId` for each completed scan and
 read the `id`, `severity`, `file`, `line`, `confidence` and `commitScan.commitHash` of every
@@ -125,3 +123,4 @@ otherwise.
 - **WHEN** more than 50 findings have a file
 - **THEN** only the 50 highest-severity rows are rendered
 - **AND** a note states how many located findings exist in total and points to the scans
+

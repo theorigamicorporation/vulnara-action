@@ -94,6 +94,29 @@ label belongs to a category scan rather than to this input:
 scan tool 'AEGIS' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. Open https://vulnara.rso.dev, copy the id shown against the scanner you want, and use that.
 ```
 
+## Resolving the repository
+
+`repository` defaults to `GITHUB_REPOSITORY`. The action first looks the repository up by the
+last segment of `repository` and takes the candidate whose git entity name equals the first
+segment, case-insensitively. That is the whole rule for GitHub, GitLab, Bitbucket and Forgejo,
+apart from the [first-result fallback](troubleshooting.md#the-wrong-repository-is-scanned).
+
+Vulnara stores an Azure DevOps repository as `<project>/<repo>` under a git entity named after
+the Azure organization, so when the first lookup finds no owner match the action searches for
+the last segment and considers `azure_devops` repositories only. `repository` then accepts:
+
+| Form | Matches |
+|---|---|
+| `<org>/<project>/<repo>` | `<project>/<repo>` under the entity `<org>` |
+| `<project>/<repo>` | `<project>/<repo>` under any Azure DevOps entity |
+| `<org>/<repo>` | the one repository named `<repo>` in any project of `<org>` |
+
+More than one candidate fails the run before any scan starts, and lists the candidates:
+
+```
+repository 'acme/widgets' is ambiguous in Vulnara (tenant 'my-tenant'): acme/web/widgets, acme/api/widgets. Pass the full org/project/repo.
+```
+
 ## The job summary
 
 When `GITHUB_STEP_SUMMARY` is set, the action appends, in order:
