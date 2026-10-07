@@ -79,6 +79,10 @@ which is what the scan looked for rather than what ran it:
 | `sca` | Dependencies |
 | `secrets` | Secrets |
 | `pii` | Personal data |
+| `dast` | Web application |
+
+No scanner serves `dast` yet. The label is in place so that the first scan covering it is not
+shown as `Uncategorised`.
 
 A scanner serves one or more categories, so a label can be a set, joined with commas and
 deduplicated: two categories that render to the same label collapse to one, because a repeated

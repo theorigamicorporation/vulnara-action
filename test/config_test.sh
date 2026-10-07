@@ -318,6 +318,8 @@ test_category_display_uses_the_shared_vocabulary() {
   assert_eq "Dependencies"  "$(prelude_call category_display sca)"     "sca"
   assert_eq "Secrets"       "$(prelude_call category_display secrets)" "secrets"
   assert_eq "Personal data" "$(prelude_call category_display pii)"     "pii"
+  assert_eq "Web application" "$(prelude_call category_display dast)"  "dast"
+  assert_eq "Web application" "$(prelude_call category_display DAST)"  "dast, upper case"
   assert_eq "Dependencies"  "$(prelude_call category_display SCA)"     "the wire value is matched case-insensitively"
 }
 
@@ -325,7 +327,7 @@ test_category_display_uses_the_shared_vocabulary() {
 #       Scenario: A scanner whose categories cannot be resolved
 test_category_display_falls_back_to_uncategorised() {
   assert_eq "Uncategorised" "$(prelude_call category_display '')"           "no category"
-  assert_eq "Uncategorised" "$(prelude_call category_display dast)"         "a category this action does not know"
+  assert_eq "Uncategorised" "$(prelude_call category_display iac)"          "a category this action does not know"
   assert_eq "Uncategorised" "$(prelude_call category_display AEGIS)"        "a scanner name is not a category"
   assert_eq "Uncategorised" "$(prelude_call categories_display '')"         "an empty category set"
 }
@@ -335,8 +337,10 @@ test_categories_display_joins_and_deduplicates() {
   assert_eq "Dependencies, Secrets" "$(prelude_call categories_display sca,secrets)" "a scanner serving two categories"
   assert_eq "Secrets" "$(prelude_call categories_display secrets,secrets)" \
     "a repeated category collapses, so the label does not count scanners"
-  assert_eq "Secrets, Uncategorised" "$(prelude_call categories_display secrets,dast)" \
+  assert_eq "Secrets, Uncategorised" "$(prelude_call categories_display secrets,iac)" \
     "an unknown category is shown as Uncategorised beside the known one"
+  assert_eq "Dependencies, Web application" "$(prelude_call categories_display sca,dast)" \
+    "dast is a known category, not Uncategorised"
 }
 
 # spec: scan-orchestration / Requirement: Never identify a scanner to the caller

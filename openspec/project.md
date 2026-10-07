@@ -78,7 +78,7 @@ repository from a workflow and pointing it at a non-prod Vulnara via the `*-url`
 - **Scan tool** (`dockerScanTools`): the scanners Vulnara can run, referenced by id, or by
   the name the platform stores them under while the gateway still returns one. A scanner's
   identity is not a customer-facing fact: the action labels a scan by the **category** the
-  scanner serves (`sast`, `sca`, `secrets`, `pii`) and prints no scanner name or codename
+  scanner serves (`sast`, `sca`, `secrets`, `pii`, `dast`) and prints no scanner name or codename
   anywhere. An unresolvable category is shown as `Uncategorised`, display only.
 - **Scan result** (`scanResult`): one run of one tool against one branch; its `status`
   progresses to a terminal `SUCCESS`, `FAILED` or `CANCELLED`.
