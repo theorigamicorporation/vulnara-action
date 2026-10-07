@@ -185,12 +185,15 @@ looks_like_id() {
 # customer surface, and a workflow log on a public repository is one of those.
 # The fallback is `Uncategorised`: display only. It is never stored, never
 # filtered on, and is not a category the platform knows about.
+# `dast` is named ahead of any scanner serving it (OpenProject #1292), so the
+# first scan that covers it is not labelled `Uncategorised`.
 category_display() {
   case "$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')" in
     sast)    printf 'Code analysis' ;;
     sca)     printf 'Dependencies' ;;
     secrets) printf 'Secrets' ;;
     pii)     printf 'Personal data' ;;
+    dast)    printf 'Web application' ;;
     *)       printf 'Uncategorised' ;;
   esac
 }

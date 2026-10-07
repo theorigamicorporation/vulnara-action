@@ -121,7 +121,10 @@ a codename or product name derived from it, and not an enumeration of the catalo
 log is world-readable on a public repository, and what ran a scan is not a customer-facing fact.
 
 A scan SHALL be labelled by the category it covers. The labels are fixed: `sast` is
-`Code analysis`, `sca` is `Dependencies`, `secrets` is `Secrets`, `pii` is `Personal data`.
+`Code analysis`, `sca` is `Dependencies`, `secrets` is `Secrets`, `pii` is `Personal data`,
+`dast` is `Web application`. The wire value SHALL be matched case-insensitively. `dast` is labelled
+even though no scanner serves it yet, so the first scan covering it is not shown as
+`Uncategorised`.
 
 A scanner serves one or more categories, so a label MAY be a set. It SHALL be joined and
 deduplicated, because two categories rendering to the same label would otherwise count the
@@ -144,6 +147,11 @@ needs to know that what they asked for was rejected, not what else exists.
 - **THEN** the scan is labelled `Dependencies, Secrets`
 - **AND** a tool recording the same category twice is labelled once, so the label does not
   disclose how many scanners ran
+
+#### Scenario: A scanner serving the web application category
+- **WHEN** a resolved tool records `dast`, in any casing
+- **THEN** the scan is labelled `Web application`
+- **AND** a tool recording `sca` and `dast` is labelled `Dependencies, Web application`
 
 #### Scenario: A scanner whose categories cannot be resolved
 - **WHEN** a resolved tool records no category, or the gateway exposes no categories at all
@@ -266,3 +274,4 @@ the `cloneUrl` before using it as the browsing URL fallback.
 #### Scenario: Clone URL carries credentials
 - **WHEN** no `htmlUrl` is available and the `cloneUrl` contains `user:secret@` userinfo
 - **THEN** the browsing URL is the `cloneUrl` without the userinfo and without a trailing `.git`
+
