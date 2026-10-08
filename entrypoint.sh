@@ -9,16 +9,40 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 
 log()  { echo "vulnara: $*" >&2; }
-fail() { echo "::error::$*" >&2; exit 1; }
+fail() {
+  case "$CI_PLATFORM" in
+    github) echo "::error::$*" >&2 ;;
+    *)      echo "ERROR: $*" >&2 ;;
+  esac
+  exit 1
+}
 
 # --- console polish -------------------------------------------------------
 STEP_TOTAL=5
 step()     { echo "" >&2; echo "vulnara: [$1/${STEP_TOTAL}] $2" >&2; }
 info()     { printf 'vulnara:   %-12s %s\n' "$1" "$2" >&2; }
 ok()       { echo "vulnara:   ✓ $*" >&2; }
-warn()     { echo "::warning::$*" >&2; }
-group()    { echo "::group::$*" >&2; }
-endgroup() { echo "::endgroup::" >&2; }
+warn() {
+  case "$CI_PLATFORM" in
+    github) echo "::warning::$*" >&2 ;;
+    *)      echo "WARNING: $*" >&2 ;;
+  esac
+}
+GROUP_N=0; GROUP_ID=""
+group() {
+  case "$CI_PLATFORM" in
+    github) echo "::group::$*" >&2 ;;
+    gitlab) GROUP_N=$(( GROUP_N + 1 )); GROUP_ID="vulnara_$GROUP_N"
+            printf '\e[0Ksection_start:%s:%s[collapsed=true]\r\e[0K%s\n' "$(date +%s)" "$GROUP_ID" "$*" >&2 ;;
+    *)      echo "$*" >&2 ;;
+  esac
+}
+endgroup() {
+  case "$CI_PLATFORM" in
+    github) echo "::endgroup::" >&2 ;;
+    gitlab) printf '\e[0Ksection_end:%s:%s\r\e[0K\n' "$(date +%s)" "$GROUP_ID" >&2 ;;
+  esac
+}
 hr()       { echo "vulnara: ========================================" >&2; }
 
 # GitHub passes Docker-action inputs as INPUT_<NAME> with dashes kept
@@ -30,6 +54,41 @@ input() {
   if [ -z "$v" ]; then v="$(printenv "INPUT_$(echo "$up" | tr '-' '_')" 2>/dev/null || true)"; fi
   printf '%s' "$v"
 }
+
+# --- CI platform ------------------------------------------------------------
+# Decided before any other input, because it picks where defaults, annotations,
+# outputs and the summary come from and go to. An invalid override is reported in
+# the detected platform's syntax.
+detect_platform() {
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then echo github
+  elif [ "${GITLAB_CI:-}" = "true" ]; then echo gitlab
+  else echo none; fi
+}
+CI_PLATFORM="$(detect_platform)"
+REQUESTED_PLATFORM="$(input ci-platform | tr '[:upper:]' '[:lower:]')"
+case "$REQUESTED_PLATFORM" in
+  "") ;;
+  github|gitlab|none) CI_PLATFORM="$REQUESTED_PLATFORM" ;;
+  *) fail "invalid ci-platform '$REQUESTED_PLATFORM' (expected github|gitlab|none)" ;;
+esac
+
+default_branch() {
+  case "$CI_PLATFORM" in
+    github) printf '%s' "${GITHUB_REF_NAME:-}" ;;
+    gitlab) printf '%s' "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-${CI_COMMIT_BRANCH:-}}" ;;
+  esac
+}
+default_repository() {
+  case "$CI_PLATFORM" in
+    github) printf '%s' "${GITHUB_REPOSITORY:-}" ;;
+    gitlab) printf '%s' "${CI_PROJECT_PATH:-}" ;;
+  esac
+}
+
+REPORT_DIR="$(input report-dir)"
+if [ -z "$REPORT_DIR" ] && [ "$CI_PLATFORM" = "gitlab" ] && [ -n "${CI_PROJECT_DIR:-}" ]; then
+  REPORT_DIR="$CI_PROJECT_DIR/.vulnara"
+fi
 
 # --- config (overridable for non-prod) ------------------------------------
 TOKEN_URL="$(input token-url)";       [ -n "$TOKEN_URL" ]   || TOKEN_URL="https://auth.theorigamicorporation.com/application/o/token/"
@@ -44,8 +103,8 @@ SERVICE_ACCOUNT="$(input service-account)"
 TOKEN="$(input token)"
 TENANT="$(input tenant)"
 SCAN_TOOLS="$(input scan-tools)"
-BRANCH="$(input branch)";         [ -n "$BRANCH" ]     || BRANCH="${GITHUB_REF_NAME:-}"
-REPOSITORY="$(input repository)";  [ -n "$REPOSITORY" ] || REPOSITORY="${GITHUB_REPOSITORY:-}"
+BRANCH="$(input branch)";         [ -n "$BRANCH" ]     || BRANCH="$(default_branch)"
+REPOSITORY="$(input repository)";  [ -n "$REPOSITORY" ] || REPOSITORY="$(default_repository)"
 GIT_TOKEN_ID="$(input git-token-id)"
 FAIL_ON="$(input fail-on | tr '[:upper:]' '[:lower:]')"; [ -n "$FAIL_ON" ] || FAIL_ON="critical"
 CREATE_ISSUE="$(input create-issue)";     [ -n "$CREATE_ISSUE" ]   || CREATE_ISSUE="false"
@@ -164,11 +223,16 @@ REPO_QUERY='query($l:List){repositories(list:$l){total items{id repositoryName p
 resolve_repository() {
   local owner="${REPOSITORY%%/*}" name="${REPOSITORY##*/}" rest="${REPOSITORY#*/}" data item azure count
   local lowner; lowner="$(echo "$owner" | tr '[:upper:]' '[:lower:]')"
+  # A GitLab subgroup project is stored under the entity "group/sub", so the
+  # non-Azure owner is everything before the last segment.
+  local lnamespace; lnamespace="$(echo "${REPOSITORY%/*}" | tr '[:upper:]' '[:lower:]')"
+  local provider=""; [ "$CI_PLATFORM" = "none" ] || provider="$CI_PLATFORM"
   data="$(gql "$(jq -n --arg q "$REPO_QUERY" --arg n "$name" \
     '{query:$q, variables:{l:{filters:[{field:"repositoryName",stringEquals:$n}]}}}')")"
-  item="$(echo "$data" | jq -c --arg o "$lowner" \
+  item="$(echo "$data" | jq -c --arg o "$lnamespace" --arg p "$provider" \
     '[.repositories.items[] | select(.gitEntity.gitType != "azure_devops")
-       | select(((.gitEntity.name // "") | ascii_downcase) == $o)][0] // empty')"
+       | select(((.gitEntity.name // "") | ascii_downcase) == $o)] as $c
+     | ([$c[] | select(.gitEntity.gitType == $p)][0] // $c[0]) // empty')"
   if [ -z "$item" ]; then
     # Azure stores "{project}/{repo}" under the org entity, so the name filter above never finds it.
     azure="$(gql "$(jq -n --arg q "$REPO_QUERY" --arg s "$name" \
@@ -530,6 +594,7 @@ next_step() { STEP_N=$(( STEP_N + 1 )); step "$STEP_N" "$1"; }
 RUN_START="$(date +%s)"
 hr
 log "Vulnara security scan"
+log "CI platform: $CI_PLATFORM"
 hr
 
 # --- authenticate -----------------------------------------------------------
@@ -683,20 +748,30 @@ for i in "${!SCANS[@]}"; do
 done
 
 # --- outputs ---------------------------------------------------------------
-if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  {
-    echo "scan-result-ids=$SCAN_IDS"
-    echo "highest-severity=$(echo "$HIGHEST_NAME" | tr '[:upper:]' '[:lower:]')"
-    echo "passed=$PASSED"
-    if [ -n "$WEB_SRID" ]; then
-      echo "web-target-id=$WEB_TARGET_ID"
-      echo "web-scan-result-id=$WEB_SRID"
-    fi
-  } >> "$GITHUB_OUTPUT"
+output_lines() {
+  echo "scan-result-ids=$SCAN_IDS"
+  echo "highest-severity=$(echo "$HIGHEST_NAME" | tr '[:upper:]' '[:lower:]')"
+  echo "passed=$PASSED"
+  if [ -n "$WEB_SRID" ]; then
+    echo "web-target-id=$WEB_TARGET_ID"
+    echo "web-scan-result-id=$WEB_SRID"
+  fi
+}
+# A GitLab dotenv report accepts only [A-Za-z0-9_] names.
+dotenv_lines() {
+  output_lines | awk '{ i = index($0, "="); k = toupper(substr($0, 1, i - 1)); gsub("-", "_", k)
+                        print "VULNARA_" k "=" substr($0, i + 1) }'
+}
+if [ "$CI_PLATFORM" = "github" ]; then
+  [ -z "${GITHUB_OUTPUT:-}" ] || output_lines >> "$GITHUB_OUTPUT"
+elif [ -n "$REPORT_DIR" ]; then
+  mkdir -p "$REPORT_DIR"
+  dotenv_lines > "$REPORT_DIR/outputs.env"
 fi
 
 # --- job summary -----------------------------------------------------------
-if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+render_summary() {
+  local verdict badge repo_md shown
   if [ "$PASSED" = "true" ]; then verdict="Passed"; badge="✅"; else verdict="Failed"; badge="❌"; fi
   repo_md="\`$REPO_FULLNAME\`"
   [ -z "$REPO_URL" ] || repo_md="[\`$REPO_FULLNAME\`]($REPO_URL)"
@@ -800,7 +875,17 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         fi
       fi
     fi
-  } >> "$GITHUB_STEP_SUMMARY"
+  }
+}
+if [ "$CI_PLATFORM" = "github" ]; then
+  [ -z "${GITHUB_STEP_SUMMARY:-}" ] || render_summary >> "$GITHUB_STEP_SUMMARY"
+elif [ -n "$REPORT_DIR" ]; then
+  render_summary > "$REPORT_DIR/summary.md"
+  if [ "$CI_PLATFORM" = "gitlab" ]; then
+    group "Vulnara summary"
+    cat "$REPORT_DIR/summary.md" >&2
+    endgroup
+  fi
 fi
 
 hr

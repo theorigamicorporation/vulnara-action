@@ -51,8 +51,9 @@ equal to the threshold, and pass otherwise.
 - **THEN** the highest severity is reported as `none` and the gate passes
 
 ### Requirement: Publish action outputs
-The system SHALL append `scan-result-ids`, `highest-severity` and `passed` to the file named
-by the `GITHUB_OUTPUT` environment variable when it is set. `scan-result-ids` is the
+The system SHALL publish `scan-result-ids`, `highest-severity` and `passed` through the
+detected CI platform's output sink, as the `ci-platform` capability specifies; on GitHub that
+is appending to the file named by `GITHUB_OUTPUT` when it is set. `scan-result-ids` is the
 space-separated list of started scan result ids, `highest-severity` is the lowercased highest
 severity or `none`, and `passed` is `true` or `false`.
 
@@ -62,15 +63,17 @@ severity or `none`, and `passed` is `true` or `false`.
   exits non-zero, so downstream steps can read the outputs
 
 #### Scenario: GITHUB_OUTPUT unavailable
-- **WHEN** `GITHUB_OUTPUT` is not set in the environment
+- **WHEN** the platform is `github` and `GITHUB_OUTPUT` is not set in the environment
 - **THEN** the action skips writing outputs and still completes its gate decision
 
 ### Requirement: Render the job summary
-The system SHALL append a Markdown summary to the file named by `GITHUB_STEP_SUMMARY` when it
-is set, containing a pass/fail heading, a table of repository, provider, visibility, branch,
-languages, gate setting, highest severity and total duration, a severity count table, and a
-per-scan table headed `Category`, carrying the category label each scan covered, its duration,
-its finding count and a link to `<app-url>/repository-scans/<scan result id>`.
+The system SHALL publish a Markdown summary through the detected CI platform's summary sink, as
+the `ci-platform` capability specifies; on GitHub that is appending to the file named by
+`GITHUB_STEP_SUMMARY` when it is set. The summary contains a pass/fail heading, a table of
+repository, provider, visibility, branch, languages, gate setting, highest severity and total
+duration, a severity count table, and a per-scan table headed `Category`, carrying the category
+label each scan covered, its duration, its finding count and a link to
+`<app-url>/repository-scans/<scan result id>`.
 
 #### Scenario: Summary written after a scan run
 - **WHEN** the scans complete and `GITHUB_STEP_SUMMARY` is set
@@ -84,7 +87,7 @@ its finding count and a link to `<app-url>/repository-scans/<scan result id>`.
 - **AND** no scanner name, codename or product name appears in the summary
 
 #### Scenario: Summary unavailable
-- **WHEN** `GITHUB_STEP_SUMMARY` is not set
+- **WHEN** the platform is `github` and `GITHUB_STEP_SUMMARY` is not set
 - **THEN** no summary is rendered and the run otherwise behaves identically
 
 ### Requirement: Link findings to source lines

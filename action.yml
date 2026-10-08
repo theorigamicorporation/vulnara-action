@@ -20,11 +20,11 @@ inputs:
     required: false
     default: ''
   branch:
-    description: 'Branch to scan. Defaults to the branch that triggered the workflow.'
+    description: 'Branch to scan. Defaults to the branch that triggered the workflow or pipeline.'
     required: false
     default: ''
   repository:
-    description: 'owner/name of the repository to scan in Vulnara. Defaults to the current GitHub repository.'
+    description: 'owner/name of the repository to scan in Vulnara. Defaults to the current repository (GitHub) or project path (GitLab).'
     required: false
     default: ''
   git-token-id:
@@ -79,6 +79,14 @@ inputs:
     description: 'OAuth client id used for the service-account token exchange (override for non-prod).'
     required: false
     default: 'hl04e6MSMRY60LdpGh5rdMRQjkPxvldAYoqXdzo4'
+  ci-platform:
+    description: 'CI platform to behave as: github, gitlab or none. Empty detects it from the environment.'
+    required: false
+    default: ''
+  report-dir:
+    description: 'Directory for outputs.env and summary.md on platforms without a step summary (GitLab). Empty means .vulnara in the project directory on GitLab, and no files elsewhere.'
+    required: false
+    default: ''
 
 outputs:
   scan-result-ids:
