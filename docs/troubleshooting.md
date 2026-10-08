@@ -75,6 +75,34 @@ anyway. The scan then fails on the platform side and the job fails with
 A warning, not an error, and the scan is still attempted, but the platform will usually reject
 it. Enable the repository in Vulnara.
 
+### `web application scanning is not enabled for workspace '<tenant>'`
+
+The workspace may not run web application scans, either because `scanCategories` does not
+list it or because the start was refused for that reason. Nothing was registered or started.
+Ask your Vulnara administrator to enable it, or remove `web-target-id`/`web-url`.
+
+### `web-url requires web-ownership-consent: true`
+
+`web-url` may register the URL as a web target, which records that you own the application or
+are authorised to scan it. The action never gives that attestation for you: set
+`web-ownership-consent: 'true'` (exactly that string), or pass an existing target as
+`web-target-id`.
+
+### `the workspace's plan limit for web application scanning is reached`
+
+The plan's web scan minutes, parallel scans or web target count is used up; the code in
+brackets says which. Wait for running scans to finish, remove unused web targets, or raise the
+plan.
+
+### `the web target does not resolve to public addresses only`
+
+Only publicly reachable applications can be scanned. A preview behind a VPN, on a private
+network or on an internal host name cannot be.
+
+### `web-url '<url>' matches <n> web targets`
+
+More than one web target has that base URL. Pass the one to scan as `web-target-id`.
+
 ### `timed out after <n>s waiting for '<codename>'`
 
 The scan did not reach a terminal state inside `wait-timeout`. The scan itself keeps running on

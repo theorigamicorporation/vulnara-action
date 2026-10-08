@@ -109,6 +109,22 @@ sequenceDiagram
    per severity, the job summary is rendered, the outputs are written and the gate decides the
    exit code. See [Reference](reference.md).
 
+### With a web application scan
+
+When `web-target-id` or `web-url` is set, one more step, **Resolve web target**, runs after the
+scanners are resolved (or straight after authentication when `scan-tools` is empty, in which
+case steps 2 and 3 are skipped and the run has four steps instead of five; a run doing both has
+six):
+
+- `scanCategories` is read and the run fails closed unless it lists `DAST`.
+- `webTarget(id)` is read for `web-target-id`. For `web-url`, `webTargets` filtered on the host
+  is listed and the base URLs compared; no match registers the URL with `createWebTarget`
+  (`ownershipConsent: true`, given by the workflow).
+- `startWebScan(input: {webTargetId})` is sent after the repository scans are started, and
+  `webScanResult(id) { status }` is polled after they finish, in its own `wait-timeout` window.
+- Two `dastFindings` requests count the findings per severity and fetch the top 50 for the
+  summary. The counts join the repository totals before the gate.
+
 ## Request shape
 
 Every GraphQL request is a JSON POST to `gateway-url` carrying `Authorization: Bearer <jwt>`

@@ -16,8 +16,9 @@ inputs:
     description: 'Vulnara tenant (workspace) id the service account belongs to.'
     required: true
   scan-tools:
-    description: 'Comma-separated scan tool ids to run. Names are not accepted. List the ids with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`.'
-    required: true
+    description: 'Comma-separated scan tool ids to run on the repository. Names are not accepted. List the ids with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. Required unless web-target-id or web-url is set.'
+    required: false
+    default: ''
   branch:
     description: 'Branch to scan. Defaults to the branch that triggered the workflow.'
     required: false
@@ -43,13 +44,25 @@ inputs:
     required: false
     default: 'false'
   wait-timeout:
-    description: 'Max seconds to wait for the scan(s) to finish before failing.'
+    description: 'Max seconds to wait for each scan (repository or web application) to finish before failing.'
     required: false
     default: '1800'
   poll-interval:
     description: 'Seconds between scan status checks.'
     required: false
     default: '15'
+  web-target-id:
+    description: 'Id of an existing Vulnara web target to run a web application scan on, e.g. after deploying a preview. Its findings feed the same fail-on gate. Mutually exclusive with web-url.'
+    required: false
+    default: ''
+  web-url:
+    description: 'Base URL of a web application to scan. The web target registered for it is reused, or the URL is registered as a new web target. Requires web-ownership-consent: true. Mutually exclusive with web-target-id.'
+    required: false
+    default: ''
+  web-ownership-consent:
+    description: 'Set to exactly "true" to confirm you own the application at web-url or are authorised to scan it. Required for web-url; registering a target records this attestation.'
+    required: false
+    default: 'false'
   app-url:
     description: 'Vulnara web app base URL, used to build links to scans in the platform (override for non-prod).'
     required: false
@@ -74,6 +87,10 @@ outputs:
     description: 'The highest finding severity discovered across the scans (or "none").'
   passed:
     description: '"true" if the scans passed the fail-on gate, "false" otherwise.'
+  web-target-id:
+    description: 'Id of the web target that was scanned, when a web application scan ran.'
+  web-scan-result-id:
+    description: 'Id of the web application scan result, when one ran.'
 
 runs:
   using: 'docker'
