@@ -12,7 +12,7 @@ the outputs it writes.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a GitHub Actions secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id, sent as the `X-Tenant` header on every request. |
-| `scan-tools` | yes | | Comma-separated scan tool ids. See [Reference](reference.md#scanners). |
+| `scan-tools` | no | | Comma-separated scan tool ids to run on the repository. Required unless `web-target-id` or `web-url` is set. See [Reference](reference.md#scanners). |
 | `branch` | no | `GITHUB_REF_NAME` | Branch to scan. |
 | `repository` | no | `GITHUB_REPOSITORY` | `owner/name` to resolve in Vulnara. Azure DevOps also takes `org/project/repo` or `project/repo`. See [Reference](reference.md#resolving-the-repository). |
 | `git-token-id` | no | | Vulnara git token id. Required for private repositories. |
@@ -21,6 +21,9 @@ the outputs it writes.
 | `auto-remediate` | no | `false` | Ask Vulnara to open a fix pull request. Requires `create-issue`. |
 | `wait-timeout` | no | `1800` | Max seconds to wait for a scan. Applied **per scan**, not per run. |
 | `poll-interval` | no | `15` | Seconds between status checks. |
+| `web-target-id` | no | | Id of an existing web target to run a web application scan on. Mutually exclusive with `web-url`. See [Reference](reference.md#web-application-scans). |
+| `web-url` | no | | Base URL of a web application to scan. The web target registered for it is reused, or the URL is registered as one. Requires `web-ownership-consent: true`. |
+| `web-ownership-consent` | no | `false` | Exactly `true` to confirm you own the application at `web-url` or are authorised to scan it. Registering a target records this attestation. Not needed for `web-target-id`. |
 | `app-url` | no | `https://vulnara.rso.dev` | Web app base URL, used only to build links in the job summary. A trailing slash is stripped. |
 | `gateway-url` | no | `https://vulnara-gw.rso.dev/graphql` | GraphQL gateway URL. |
 | `token-url` | no | the production identity provider `/application/o/token/` endpoint | OAuth token endpoint. |
@@ -36,13 +39,19 @@ Validation happens before the first network call.
 
 | Condition | Result |
 |---|---|
-| `service-account`, `token`, `tenant` or `scan-tools` empty | `::error::<name> is required` |
-| `repository` empty and `GITHUB_REPOSITORY` unset | `::error::repository could not be determined` |
-| `branch` empty and `GITHUB_REF_NAME` unset | `::error::branch could not be determined` |
+| `service-account`, `token` or `tenant` empty | `::error::<name> is required` |
+| `scan-tools`, `web-target-id` and `web-url` all empty | `::error::scan-tools is required` |
+| `scan-tools` set, `repository` empty and `GITHUB_REPOSITORY` unset | `::error::repository could not be determined` |
+| `scan-tools` set, `branch` empty and `GITHUB_REF_NAME` unset | `::error::branch could not be determined` |
+| `web-target-id` and `web-url` both set | `::error::set web-target-id or web-url, not both: ...` |
+| `web-target-id` not an id | `::error::web-target-id '<value>' is not a web target id. ...` |
+| `web-url` carries credentials | `::error::web-url must not carry credentials ...` (the URL is not echoed) |
+| `web-url` not `http(s)://` | `::error::web-url '<value>' is not an http(s) URL` |
+| `web-url` set, `web-ownership-consent` not exactly `true` | `::error::web-url requires web-ownership-consent: true. ...` |
 | `fail-on` not one of the five accepted values | `::error::invalid fail-on '<value>' (expected none\|low\|medium\|high\|critical)` |
 
-`create-issue` and `auto-remediate` are compared literally against `true`; any other value,
-including `TRUE`, is treated as false.
+`create-issue`, `auto-remediate` and `web-ownership-consent` are compared literally against
+`true`; any other value, including `TRUE`, is treated as false.
 
 ## Environment read from the runner
 
@@ -61,9 +70,11 @@ runnable outside Actions, provided `branch` and `repository` are passed explicit
 
 | Output | Description |
 |---|---|
-| `scan-result-ids` | Space-separated ids of the scan results that were started. Empty if none started. |
+| `scan-result-ids` | Space-separated ids of the repository scan results that were started. Empty if none started. |
 | `highest-severity` | Highest severity found across all scans, lower case, or `none`. |
 | `passed` | `true` if the run passed the `fail-on` gate, `false` otherwise. |
+| `web-target-id` | Id of the web target that was scanned. Written only when a web application scan ran. |
+| `web-scan-result-id` | Id of the web application scan result. Written only when one ran. `scan-result-ids` stays repository scans only. |
 
 With `fail-on: none` the gate never trips, so the job stays green and a later step can decide
 what to do with `passed` and `highest-severity` itself:

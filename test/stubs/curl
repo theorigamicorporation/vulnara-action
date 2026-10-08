@@ -8,7 +8,9 @@
 # Responses are chosen from the request: the OAuth token endpoint gets
 # token.json, GraphQL posts are dispatched on the operation named in the
 # request body (repositories / dockerScanTools / startRepositoryScan /
-# scanResult / scanFindings). A response file may be sequenced per call as
+# scanResult / scanFindings, and the web application operations: scanCategories /
+# webTargets / webTarget / createWebTarget / startWebScan / webScanResult /
+# webFindingCounts / webFindingItems). A response file may be sequenced per call as
 # <name>.1.json, <name>.2.json, ...; the unnumbered <name>.json is the
 # fallback for every further call.
 set -uo pipefail
@@ -58,6 +60,14 @@ esac
 # GraphQL: the body carries the operation
 op="unknown"
 case "$body" in
+  *WebFindingCounts*)     op="webFindingCounts" ;;
+  *WebFindingItems*)      op="webFindingItems" ;;
+  *startWebScan*)         op="startWebScan" ;;
+  *createWebTarget*)      op="createWebTarget" ;;
+  *scanCategories*)       op="scanCategories" ;;
+  *"webTargets("*)        op="webTargets" ;;
+  *"webTarget("*)         op="webTarget" ;;
+  *"webScanResult("*)     op="webScanResult" ;;
   *startRepositoryScan*)  op="startRepositoryScan" ;;
   *dockerScanTools*)      op="dockerScanTools" ;;
   *scanFindings*)         op="scanFindings" ;;

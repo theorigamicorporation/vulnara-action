@@ -143,6 +143,46 @@ whole scan, so read
 [how `wait-timeout` compounds](docs/troubleshooting.md#a-multi-scanner-run-takes-far-longer-than-wait-timeout)
 before adding a second scanner.
 
+## Scanning a web application
+
+The action can also run a web application scan, for example right after deploying a preview,
+and gate the build on what it finds. Web application scanning has to be enabled for the
+workspace; if it is not, the run fails before anything is registered or started.
+
+Scan a web target that already exists in Vulnara by its id:
+
+```yaml
+      - uses: theorigamicorporation/vulnara-action@v1
+        with:
+          service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
+          token: ${{ secrets.VULNARA_TOKEN }}
+          tenant: my-tenant
+          web-target-id: ${{ vars.VULNARA_WEB_TARGET_ID }}
+          fail-on: high
+```
+
+Or pass the URL you just deployed. The web target registered for that URL is reused, and if
+there is none the URL is registered as a new one. Registering a target records that you own the
+application or are authorised to scan it, so `web-url` is refused unless the workflow also says
+`web-ownership-consent: 'true'`:
+
+```yaml
+      - uses: theorigamicorporation/vulnara-action@v1
+        with:
+          service-account: ${{ vars.VULNARA_SERVICE_ACCOUNT }}
+          token: ${{ secrets.VULNARA_TOKEN }}
+          tenant: my-tenant
+          web-url: ${{ steps.deploy.outputs.preview-url }}
+          web-ownership-consent: 'true'   # I own this application or may scan it
+          fail-on: high
+```
+
+Without `scan-tools` the run scans only the web application and does not look up the
+repository. With `scan-tools` as well, the repository scans and the web scan run side by side
+and one `fail-on` gate covers both. Only publicly reachable applications can be scanned. See
+[Reference](docs/reference.md#web-application-scans) for what is matched, what is printed and
+every refusal.
+
 ## Inputs
 
 | Input | Required | Default | Description |
@@ -150,7 +190,7 @@ before adding a second scanner.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id. |
-| `scan-tools` | yes | | Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. |
+| `scan-tools` | no | | Required unless a web input is set. Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. |
 | `branch` | no | triggering branch | Branch to scan. |
 | `repository` | no | current repo | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repositories). |
@@ -159,12 +199,15 @@ before adding a second scanner.
 | `auto-remediate` | no | `false` | Open a fix pull request (requires `create-issue`). |
 | `wait-timeout` | no | `1800` | Max seconds to wait, **per scan**. |
 | `poll-interval` | no | `15` | Seconds between status checks. |
+| `web-target-id` | no | | Id of an existing web target to run a web application scan on. See [Scanning a web application](#scanning-a-web-application). |
+| `web-url` | no | | Base URL of a web application to scan; reuses its web target or registers one. Requires `web-ownership-consent: true`. |
+| `web-ownership-consent` | no | `false` | Exactly `true` to confirm you own or may scan the application at `web-url`. |
 | `app-url` | no | prod | Web app base URL, used for links in the job summary. |
 | `gateway-url` | no | prod | GraphQL gateway URL. |
 | `token-url` | no | prod | OAuth token endpoint. |
 | `oauth-client-id` | no | prod | OAuth client id for the token exchange. |
 
-Outputs (`scan-result-ids`, `highest-severity`, `passed`), validation rules and the runner
+Outputs (`scan-result-ids`, `highest-severity`, `passed`, `web-target-id`, `web-scan-result-id`), validation rules and the runner
 environment the action reads: [docs/configuration.md](docs/configuration.md).
 
 > **Working on this action?** It is driven by [just](https://just.systems/). Run `just` for the

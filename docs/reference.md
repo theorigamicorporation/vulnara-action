@@ -39,8 +39,11 @@ scan gate failed: highest severity 'Critical' meets/exceeds fail-on 'high'
 
 Three limits worth knowing:
 
-- The gate reads `scanFindings` only, which are code and secret findings. Dependency and
-  network findings are not consulted, so they cannot fail the build today.
+- The gate reads `scanFindings`, which are code and secret findings, and, when a web
+  application scan ran, its findings. Dependency and network findings are not consulted, so
+  they cannot fail the build today.
+- Triage decisions are not consulted for either kind: a finding marked not affected in Vulnara
+  still counts towards the gate.
 - A scan ending `FAILED` or `CANCELLED` fails the job on its own, before any findings are read.
 - A tool-resolution failure aborts the run before any scan is started, so an id typo fails the
   job rather than passing it with nothing scanned.
@@ -81,8 +84,8 @@ which is what the scan looked for rather than what ran it:
 | `pii` | Personal data |
 | `dast` | Web application |
 
-No scanner serves `dast` yet. The label is in place so that the first scan covering it is not
-shown as `Uncategorised`.
+`Web application` is also the label of the scan `web-target-id`/`web-url` starts; see
+[Web application scans](#web-application-scans).
 
 A scanner serves one or more categories, so a label can be a set, joined with commas and
 deduplicated: two categories that render to the same label collapse to one, because a repeated
@@ -166,6 +169,53 @@ rather than a link.
 
 The console log carries the same numbers, plus a `view scan` line per scan, and is written to
 stderr with a `vulnara:` prefix throughout.
+
+## Web application scans
+
+Set `web-target-id` or `web-url` to run one web application scan in the same job, alongside the
+repository scans or, with `scan-tools` empty, on its own.
+
+**Which target.** `web-target-id` scans that web target. `web-url` looks for a web target with
+the same base URL, comparing scheme and host case-insensitively, ignoring a trailing dot on the
+host and a fragment, and reading an empty path as `/` (`https://App.example.com` matches
+`https://app.example.com/`, `https://app.example.com/shop` does not). One match is reused. None
+registers the URL as a new web target, named after the URL. More than one fails the run and asks
+for `web-target-id`. Scope and excluded paths are set on the target in Vulnara.
+
+**Consent.** Registering a web target records an attestation that you own the application or are
+authorised to scan it. The action never makes that attestation for you: `web-url` is refused,
+before any request, unless `web-ownership-consent` is exactly `true`. Because the workflow cannot
+know whether the URL will be reused or registered, the rule is the same for both. `web-target-id`
+does not need it, since the target's attestation was recorded when it was registered.
+
+**Fail closed.** Before resolving or registering anything, the action checks that the workspace
+may run web application scans and stops if it may not. Every refusal fails the run with a
+message saying what it means, followed by the gateway's own error lines:
+
+| Refusal | Message starts with |
+|---|---|
+| Web application scanning not enabled | `web application scanning is not enabled for workspace '<tenant>'` |
+| A plan limit (`...LIMIT_EXCEEDED`) | `...: the workspace's plan limit for web application scanning is reached (<code>)` |
+| Target not publicly reachable | `...: the web target does not resolve to public addresses only` |
+| Target not found | `...: web target not found in workspace '<tenant>'` |
+| URL rejected on registration | `registering web-url '<url>': the gateway rejected the request: <field>: <reason>` |
+
+A URL carrying credentials is refused before any request and is not echoed.
+
+**Waiting.** The web scan is started after the repository scans, so they run side by side, and is
+waited on after them in its own `wait-timeout` window, polling every `poll-interval`. `FAILED`,
+`CANCELLED` or the deadline fails the run, naming `Web application` and the scan result id.
+
+**Gate and outputs.** The web scan's findings are counted per severity and added to the run's
+totals, so the one `fail-on` gate, `highest-severity` and `passed` cover both kinds of scan.
+`web-target-id` and `web-scan-result-id` are written as outputs; `scan-result-ids` stays the
+repository scans.
+
+**Summary.** The job summary gains a `Web target` row, a `Web application` row in the scans
+table linking to `<app-url>/web-targets/<id>`, and a `Web application` section: the target, its
+URL, the scan duration, the findings by severity and, when there are any, the top 50 by severity
+with the finding name, the URL it matched at and its CVE and CWE ids. A web-only run leaves the
+repository rows out. Nothing in the log or the summary names the scanner that ran.
 
 ## Related
 

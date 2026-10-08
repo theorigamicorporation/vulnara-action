@@ -7,7 +7,8 @@ security scan on a branch from CI and optionally fails the job when findings at 
 above a configured severity are discovered. It is a thin CI client for the Vulnara
 platform: it authenticates a Vulnara service account, resolves the repository and
 scan tools in Vulnara, starts one scan per tool, waits for the scans to complete,
-renders a GitHub job summary, and gates the build.
+renders a GitHub job summary, and gates the build. It can also run one web application
+scan of a registered web target, alongside the repository scans or on its own.
 
 ## Tech Stack
 
@@ -85,6 +86,12 @@ repository from a workflow and pointing it at a non-prod Vulnara via the `*-url`
 - **Finding** (`scanFindings`): a code/secret finding with a `severity`
   (`CRITICAL` > `HIGH` > `MEDIUM` > `LOW`), `file`, `line`, `confidence` and the
   commit it was found at. Dependency and network findings are out of scope today.
+- **Web target** (`webTargets`): a web application registered for scanning by base URL.
+  Registering one records an ownership attestation, which the action gives only when the
+  workflow sets `web-ownership-consent: true`.
+- **Web scan** (`startWebScan`, `webScanResult`, `dastFindings`): one web application scan of
+  one web target, labelled `Web application`; its findings carry a `severity`, the URL they
+  matched at, and CVE/CWE ids.
 
 ## Important Constraints
 

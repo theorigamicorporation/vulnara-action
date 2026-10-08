@@ -17,3 +17,9 @@ jobs:
           scan-tools: '11111111-2222-3333-4444-555555555555'
           fail-on: high
           # git-token-id: ${{ vars.VULNARA_GIT_TOKEN_ID }}   # for private repos
+          # Also scan the deployed application (web application scanning must be
+          # enabled for the workspace). Either an existing web target:
+          # web-target-id: ${{ vars.VULNARA_WEB_TARGET_ID }}
+          # or a URL, which needs your explicit ownership consent:
+          # web-url: https://preview.example.com
+          # web-ownership-consent: 'true'
