@@ -224,7 +224,7 @@ environment the action reads: [docs/configuration.md](docs/configuration.md).
 | [Troubleshooting](docs/troubleshooting.md) | Two known issues, then the common failures |
 | [Development](docs/development.md) | Local checks, non-prod runs, conventions, releasing |
 | [Testing](docs/testing.md) | The offline suite, the lint and build gates, the end-to-end cases |
-| [Specifications](openspec/specs/) | The normative behaviour: 3 capabilities, 15 requirements, 43 scenarios |
+| [Specifications](openspec/specs/) | The normative behaviour: 4 capabilities, 24 requirements, 87 scenarios |
 
 Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. Two known issues
 remain: repository resolution falls back to the first result when no owner matches, so a
