@@ -112,10 +112,20 @@ scan tool 'my-scanner' is not a scan tool id. scan-tools takes ids: this Vulnara
 
 ## Resolving the repository
 
-`repository` defaults to `GITHUB_REPOSITORY`. The action first looks the repository up by the
-last segment of `repository` and takes the candidate whose git entity name equals the first
-segment, case-insensitively. That is the whole rule for GitHub, GitLab, Bitbucket and Forgejo,
-apart from the [first-result fallback](troubleshooting.md#the-wrong-repository-is-scanned).
+`repository` defaults to the [CI platform's](configuration.md#ci-platforms) repository:
+`GITHUB_REPOSITORY` on GitHub, `CI_PROJECT_PATH` on GitLab. The action first looks the
+repository up by the last segment of `repository` and takes the candidate whose git entity name
+equals everything before it, case-insensitively. That is the whole rule for GitHub, GitLab,
+Bitbucket and Forgejo, apart from the
+[first-result fallback](troubleshooting.md#the-wrong-repository-is-scanned).
+
+A GitLab project in a subgroup works the same way: Vulnara stores it under the entity
+`group/sub`, and `group/sub/project` matches that entity, not one named `group`.
+
+When the same owner and name exist under several providers in one tenant, the candidate on the
+provider the pipeline runs on wins: a GitLab pipeline takes the `gitlab` repository, a GitHub
+workflow the `github` one. If only another provider holds it, that repository is still used, so
+a mirror can be scanned by passing `repository` explicitly.
 
 Vulnara stores an Azure DevOps repository as `<project>/<repo>` under a git entity named after
 the Azure organization, so when the first lookup finds no owner match the action searches for
@@ -135,7 +145,9 @@ repository 'acme/widgets' is ambiguous in Vulnara (tenant 'my-tenant'): acme/web
 
 ## The job summary
 
-When `GITHUB_STEP_SUMMARY` is set, the action appends, in order:
+On GitHub the summary is appended to `GITHUB_STEP_SUMMARY` when it is set. On GitLab it is
+written to `<report-dir>/summary.md` and printed in a collapsed log section (see
+[CI platforms](configuration.md#ci-platforms)). The content is the same everywhere, in order:
 
 1. A verdict heading, passed or failed, and a table of repository (linked when the platform
    returned a URL), provider and visibility, branch, languages, the gate setting, the highest

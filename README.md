@@ -206,6 +206,8 @@ every refusal.
 | `gateway-url` | no | prod | GraphQL gateway URL. |
 | `token-url` | no | prod | OAuth token endpoint. |
 | `oauth-client-id` | no | prod | OAuth client id for the token exchange. |
+| `ci-platform` | no | detected | `github` \| `gitlab` \| `none`. Where defaults, annotations, outputs and the summary come from and go to. |
+| `report-dir` | no | `.vulnara` on GitLab | Where `outputs.env` and `summary.md` are written off GitHub. |
 
 Outputs (`scan-result-ids`, `highest-severity`, `passed`, `web-target-id`, `web-scan-result-id`), validation rules and the runner
 environment the action reads: [docs/configuration.md](docs/configuration.md).

@@ -136,7 +136,9 @@ default_inputs() {
   env_set "INPUT_GATEWAY-URL"     "https://gw.example.test/graphql"
   env_set "INPUT_TOKEN-URL"       "https://auth.example.test/application/o/token/"
   env_set "INPUT_OAUTH-CLIENT-ID" "test-client-id"
+  env_set "GITHUB_ACTIONS"        "true"
   unset GITHUB_REF_NAME GITHUB_REPOSITORY GITHUB_OUTPUT GITHUB_STEP_SUMMARY
+  unset GITLAB_CI CI_PROJECT_DIR CI_PROJECT_PATH CI_COMMIT_BRANCH CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
 }
 
 # --- running the action ---------------------------------------------------

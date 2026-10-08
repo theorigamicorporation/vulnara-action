@@ -55,11 +55,13 @@ For a gateway to develop against, see
   action inputs with dashes preserved (`INPUT_SERVICE-ACCOUNT`), which Bash cannot address.
 - Send user-facing lines to stderr with the `vulnara:` prefix, through `log`, `step`, `info`,
   `ok` or `warn`.
-- Use `::error::` and `::warning::` for anything that should surface as a GitHub annotation.
+- Report errors and warnings through `fail` and `warn`, and log groups through `group` and
+  `endgroup`, never a literal `::error::`. They render in the detected CI platform's syntax.
+- Never test `CI_PLATFORM` outside the platform helpers, the defaults and the two sink blocks.
 - Keep every endpoint overridable: a production default in both `action.yml` and
   `entrypoint.sh`, plus an input to replace it.
-- Never write a credential to `GITHUB_OUTPUT`, `GITHUB_STEP_SUMMARY` or the log. The JWT stays
-  in memory.
+- Never write a credential to `GITHUB_OUTPUT`, `GITHUB_STEP_SUMMARY`, a file under `report-dir`
+  or the log. The JWT stays in memory.
 
 ## Changing the interface
 

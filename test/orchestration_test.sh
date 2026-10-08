@@ -672,3 +672,73 @@ J
   assert_contains "$ERR" "::error::timed out after 0s waiting for 'Dependencies, Secrets' (still RUNNING, id scan-aaaaaaaa-0001)" \
     "timeout message names the timeout, status and scan id"
 }
+
+repo_item() { # id repositoryName entity gitType
+  printf '{"id":"%s","repositoryName":"%s","private":false,"enabled":true,"programmingLanguage":[],"cloneUrl":null,"gitEntity":{"__typename":"Organization","name":"%s","gitType":"%s","htmlUrl":"https://git.example.test/%s"}}' "$1" "$2" "$3" "$4" "$3"
+}
+
+# spec: scan-orchestration / Requirement: Match repositories under nested namespaces /
+#       Scenario: GitLab project in a subgroup
+test_gitlab_subgroup_project_is_resolved_by_its_namespace() {
+  env_set "INPUT_REPOSITORY" "acme/platform/widgets"
+  fixture repositories.json <<J
+{"data":{"repositories":{"items":[$(repo_item repo-sub widgets acme/platform gitlab)]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-sub" "subgroup project resolved"
+  assert_info "Repository" "acme/platform/widgets" "reported with its full namespace"
+  assert_contains "$(graphql_body_for repositories)" '"stringEquals":"widgets"' "looked up by the last segment"
+}
+
+# spec: scan-orchestration / Requirement: Match repositories under nested namespaces /
+#       Scenario: Same project name in a parent group
+test_gitlab_subgroup_wins_over_the_parent_group() {
+  env_set "INPUT_REPOSITORY" "acme/platform/widgets"
+  fixture repositories.json <<J
+{"data":{"repositories":{"items":[$(repo_item repo-parent widgets acme gitlab),$(repo_item repo-sub widgets acme/platform gitlab)]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-sub" "the subgroup entity, not the parent group"
+}
+
+# spec: scan-orchestration / Requirement: Prefer the platform's provider when resolving the repository /
+#       Scenario: Same repository on GitHub and GitLab in one tenant
+test_gitlab_pipeline_prefers_the_gitlab_repository() {
+  env_unset "GITHUB_ACTIONS"
+  env_set "GITLAB_CI" "true"
+  env_set "CI_PROJECT_DIR" "$WORKDIR"
+  fixture repositories.json <<J
+{"data":{"repositories":{"items":[$(repo_item repo-gh widgets acme github),$(repo_item repo-gl widgets acme gitlab)]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-gl" "the GitLab twin"
+  assert_info "Provider" "gitlab" "provider"
+}
+
+# spec: scan-orchestration / Requirement: Prefer the platform's provider when resolving the repository /
+#       Scenario: Only another provider matches
+test_gitlab_pipeline_still_resolves_a_github_only_repository() {
+  env_unset "GITHUB_ACTIONS"
+  env_set "GITLAB_CI" "true"
+  env_set "CI_PROJECT_DIR" "$WORKDIR"
+  fixture repositories.json <<J
+{"data":{"repositories":{"items":[$(repo_item repo-gh widgets acme github)]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-gh" "resolved as before"
+}
+
+# spec: scan-orchestration / Requirement: Prefer the platform's provider when resolving the repository /
+#       Scenario: GitHub run with a GitLab twin
+test_github_run_prefers_the_github_repository() {
+  fixture repositories.json <<J
+{"data":{"repositories":{"items":[$(repo_item repo-gl widgets acme gitlab),$(repo_item repo-gh widgets acme github)]}}}
+J
+  run_action
+  assert_success
+  assert_info "Vulnara id" "repo-gh" "the GitHub twin"
+}

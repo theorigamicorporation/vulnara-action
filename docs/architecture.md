@@ -125,6 +125,14 @@ six):
 - Two `dastFindings` requests count the findings per severity and fetch the top 50 for the
   summary. The counts join the repository totals before the gate.
 
+## CI platforms
+
+Everything above is plain Bash and runs wherever the image runs. Only five things depend on the
+CI system: where `branch` and `repository` default from, how errors, warnings and log groups are
+written, and where the outputs and the summary go. The script detects the platform once, before
+reading any input, and only the helpers for those five things look at it. GitHub and GitLab are
+supported; see [CI platforms](configuration.md#ci-platforms) for the table.
+
 ## Request shape
 
 Every GraphQL request is a JSON POST to `gateway-url` carrying `Authorization: Bearer <jwt>`
