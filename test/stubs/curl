@@ -10,7 +10,7 @@
 # request body (repositories / dockerScanTools / startRepositoryScan /
 # scanResult / scanFindings, and the web application operations: scanCategories /
 # webTargets / webTarget / createWebTarget / startWebScan / webScanResult /
-# webFindingCounts / webFindingItems). A response file may be sequenced per call as
+# webFindingCounts / webFindingItems, and exploitedFindings). A response file may be sequenced per call as
 # <name>.1.json, <name>.2.json, ...; the unnumbered <name>.json is the
 # fallback for every further call.
 set -uo pipefail
@@ -60,6 +60,7 @@ esac
 # GraphQL: the body carries the operation
 op="unknown"
 case "$body" in
+  *ExploitedFindings*)    op="exploitedFindings" ;;
   *WebFindingCounts*)     op="webFindingCounts" ;;
   *WebFindingItems*)      op="webFindingItems" ;;
   *startWebScan*)         op="startWebScan" ;;

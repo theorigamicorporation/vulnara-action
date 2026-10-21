@@ -224,3 +224,27 @@ repository rows out. Nothing in the log or the summary names the scanner that ra
   [Troubleshooting](troubleshooting.md) for when the gate does not behave.
 - [`openspec/specs/findings-gate-reporting/spec.md`](../openspec/specs/findings-gate-reporting/spec.md)
   is the normative version of this page.
+
+## The exploited gate
+
+`fail-on-exploited` adds a second gate beside `fail-on`. It looks at whether a vulnerability is
+being exploited, not at how bad it would be.
+
+- `kev` fails the job on any finding in this run whose CVE is in the CISA
+  [Known Exploited Vulnerabilities](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)
+  catalogue.
+- `likely` also fails on a finding whose FIRST [EPSS](https://www.first.org/epss/) score is at or
+  above `epss-threshold` (default `0.1`, roughly the top few percent of all CVEs).
+
+After the scans, the action asks Vulnara's `exploitedFindings` query. Vulnara answers from each
+target's latest successful scans, which are this run's. The action keeps the findings of this
+run's repository and web target. It skips any finding that already has a triage decision
+recorded in Vulnara: dismissed as not affected, a false positive or resolved, or given a response
+such as `will_not_fix`. Accepting a risk in Vulnara is how a team lets a build pass on purpose.
+
+The gate fails closed. If Vulnara has never synced the feeds, the job fails with
+`::error::fail-on-exploited is '<mode>' but Vulnara has not synced the CISA KEV and EPSS feeds yet`
+instead of passing without having checked.
+
+The job summary lists the exploited findings with the CVE (linked to NVD), KEV status, ransomware
+use and CISA due date, the EPSS score, the package and the fixed version.

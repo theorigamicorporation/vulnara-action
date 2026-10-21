@@ -52,6 +52,8 @@ CREATE_ISSUE="$(input create-issue)";     [ -n "$CREATE_ISSUE" ]   || CREATE_ISS
 AUTO_REMEDIATE="$(input auto-remediate)"; [ -n "$AUTO_REMEDIATE" ] || AUTO_REMEDIATE="false"
 WAIT_TIMEOUT="$(input wait-timeout)";     [ -n "$WAIT_TIMEOUT" ]   || WAIT_TIMEOUT="1800"
 POLL_INTERVAL="$(input poll-interval)";   [ -n "$POLL_INTERVAL" ]  || POLL_INTERVAL="15"
+FAIL_ON_EXPLOITED="$(input fail-on-exploited | tr '[:upper:]' '[:lower:]')"; [ -n "$FAIL_ON_EXPLOITED" ] || FAIL_ON_EXPLOITED="none"
+EPSS_THRESHOLD="$(input epss-threshold)"; [ -n "$EPSS_THRESHOLD" ] || EPSS_THRESHOLD="0.1"
 
 WEB_TARGET_ID="$(input web-target-id | sed 's/^ *//;s/ *$//')"
 WEB_URL="$(input web-url | sed 's/^ *//;s/ *$//')"
@@ -82,6 +84,12 @@ case "$FAIL_ON" in
   high) FAIL_RANK=3 ;; critical) FAIL_RANK=4 ;;
   *) fail "invalid fail-on '$FAIL_ON' (expected none|low|medium|high|critical)" ;;
 esac
+case "$FAIL_ON_EXPLOITED" in
+  none|kev|likely) ;;
+  *) fail "invalid fail-on-exploited '$FAIL_ON_EXPLOITED' (expected none|kev|likely)" ;;
+esac
+echo "$EPSS_THRESHOLD" | grep -Eq '^(0(\.[0-9]+)?|1(\.0+)?)$' \
+  || fail "invalid epss-threshold '$EPSS_THRESHOLD' (expected a number from 0 to 1)"
 
 # --- web application inputs (validated before any network call) ----------
 # web-url may register the URL as a scan target, and registering one is an
@@ -670,6 +678,37 @@ info "Medium" "${SEV_TOTAL[MEDIUM]}"
 info "Low" "${SEV_TOTAL[LOW]}"
 info "Total" "$TOTAL"
 info "Highest" "$HIGHEST_LABEL"
+# --- exploited findings gate -----------------------------------------------
+# Findings of this run's targets whose CVE is in CISA KEV (kev) or, for likely,
+# also has an EPSS score at or above epss-threshold. The platform answers from
+# each target's latest successful scans, which this run's scans now are.
+# Fails closed: a gate that was asked for and cannot be evaluated fails the build
+# rather than passing it silently.
+EXPLOITED_ITEMS="[]"; EXPLOITED_COUNT=0; KEV_COUNT=0; EXPLOITED_FAILED="false"
+if [ "$FAIL_ON_EXPLOITED" != "none" ]; then
+  epss_min="$EPSS_THRESHOLD"; [ "$FAIL_ON_EXPLOITED" = "kev" ] && epss_min="1"
+  data="$(gql "$(jq -n --argjson e "$epss_min" \
+    '{query:"query ExploitedFindings($e:Float,$n:Int){exploitedFindings(epssMin:$e,limit:$n){kevSyncedAt items{targetType targetId title installedVersion fixedVersion severity cve epss kev kevRansomware kevDueDate triageState triageResponse}}}",variables:{e:$e,n:2000}}')")"
+  if [ "$(echo "$data" | jq -r '.exploitedFindings.kevSyncedAt // ""')" = "" ]; then
+    fail "fail-on-exploited is '$FAIL_ON_EXPLOITED' but Vulnara has not synced the CISA KEV and EPSS feeds yet, so exploitation cannot be checked"
+  fi
+  # A finding someone already decided about (dismissed, or a recorded response
+  # such as will_not_fix) is that team's call, not a build failure.
+  EXPLOITED_ITEMS="$(echo "$data" | jq -c \
+    --arg repo "$([ "$REPO_SCAN" = "true" ] && echo "$REPO_ID")" \
+    --arg web "$([ -n "$WEB_SRID" ] && echo "$WEB_TARGET_ID")" \
+    --arg mode "$FAIL_ON_EXPLOITED" '
+      [.exploitedFindings.items[]
+       | select((.targetType == "repository" and $repo != "" and .targetId == $repo)
+             or (.targetType == "web_target" and $web != "" and .targetId == $web))
+       | select(.triageState as $s | ["resolved","resolved_with_pedigree","false_positive","not_affected"] | index($s) | not)
+       | select(.triageResponse == null)
+       | select($mode == "likely" or .kev)]')"
+  EXPLOITED_COUNT="$(echo "$EXPLOITED_ITEMS" | jq 'length')"
+  KEV_COUNT="$(echo "$EXPLOITED_ITEMS" | jq '[.[] | select(.kev)] | length')"
+  info "Exploited" "$EXPLOITED_COUNT (in CISA KEV: $KEV_COUNT)"
+  if [ "$EXPLOITED_COUNT" -gt 0 ]; then EXPLOITED_FAILED="true"; PASSED="false"; fi
+fi
 for i in "${!SCANS[@]}"; do
   info "view scan" "${SCAN_CATEGORIES[$i]}: ${APP_URL}/repository-scans/${SCANS[$i]}"
 done
@@ -688,6 +727,8 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "scan-result-ids=$SCAN_IDS"
     echo "highest-severity=$(echo "$HIGHEST_NAME" | tr '[:upper:]' '[:lower:]')"
     echo "passed=$PASSED"
+    echo "exploited-count=$EXPLOITED_COUNT"
+    echo "kev-count=$KEV_COUNT"
     if [ -n "$WEB_SRID" ]; then
       echo "web-target-id=$WEB_TARGET_ID"
       echo "web-scan-result-id=$WEB_SRID"
@@ -715,6 +756,7 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
       echo "| Web target | [$(md_cell "$WEB_TARGET_NAME")]($APP_URL/web-targets/$WEB_TARGET_ID) |"
     fi
     echo "| Gate | \`fail-on: $FAIL_ON\` |"
+    [ "$FAIL_ON_EXPLOITED" = "none" ] || echo "| Exploited gate | \`fail-on-exploited: $FAIL_ON_EXPLOITED\`$([ "$FAIL_ON_EXPLOITED" = "likely" ] && echo " (EPSS >= $EPSS_THRESHOLD)") |"
     echo "| Highest severity | **$HIGHEST_LABEL** |"
     echo "| Duration | ${RUN_TIME}s |"
     echo ""
@@ -770,6 +812,23 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         echo "_Showing the top $FINDING_LIMIT of $shown located findings. Open the scans above to see all._"
       fi
     fi
+    if [ "$EXPLOITED_COUNT" -gt 0 ]; then
+      echo ""
+      echo "### Actively exploited"
+      echo ""
+      echo "| CVE | CISA KEV | EPSS | Package | Version |"
+      echo "|---|---|---|---|---|"
+      echo "$EXPLOITED_ITEMS" | jq -r --argjson limit "$FINDING_LIMIT" '
+        def md: tostring | gsub("[\r\n]+"; " ") | gsub("\\|"; "\\|");
+        sort_by((if .kev then 0 else 1 end), -(.epss // 0)) | .[:$limit] | .[]
+        | "| [" + .cve + "](https://nvd.nist.gov/vuln/detail/" + .cve + ") | "
+          + (if .kev then "Yes" + (if .kevRansomware then ", ransomware" else "" end)
+               + (if .kevDueDate then ", due " + .kevDueDate else "" end) else "-" end) + " | "
+          + (if .epss == null then "-" else ((.epss * 1000 | round) / 10 | tostring) + "%" end) + " | "
+          + ((.title // "-") | md) + " | "
+          + ((.installedVersion // "-") | md)
+          + (if .fixedVersion then " -> " + (.fixedVersion | md) else "" end) + " |"'
+    fi
     if [ -n "$WEB_SRID" ]; then
       echo ""
       echo "### $WEB_LABEL"
@@ -805,8 +864,12 @@ fi
 
 hr
 log "findings -> critical=${SEV_TOTAL[CRITICAL]} high=${SEV_TOTAL[HIGH]} medium=${SEV_TOTAL[MEDIUM]} low=${SEV_TOTAL[LOW]} (total $TOTAL) in ${RUN_TIME}s"
-if [ "$PASSED" = "false" ]; then
+if [ "$HIGHEST" -ge "$FAIL_RANK" ]; then
+  [ "$EXPLOITED_FAILED" = "false" ] || echo "::error::exploited gate failed: $EXPLOITED_COUNT finding(s) in this run are actively exploited ($KEV_COUNT in CISA KEV)" >&2
   fail "scan gate failed: highest severity '$HIGHEST_LABEL' meets/exceeds fail-on '$FAIL_ON'"
 fi
-log "✓ scan gate passed (fail-on: $FAIL_ON, highest: $HIGHEST_LABEL)"
+if [ "$EXPLOITED_FAILED" = "true" ]; then
+  fail "exploited gate failed: $EXPLOITED_COUNT finding(s) in this run are actively exploited ($KEV_COUNT in CISA KEV), fail-on-exploited '$FAIL_ON_EXPLOITED'"
+fi
+log "✓ scan gate passed (fail-on: $FAIL_ON, highest: $HIGHEST_LABEL$([ "$FAIL_ON_EXPLOITED" = "none" ] || echo ", fail-on-exploited: $FAIL_ON_EXPLOITED"))"
 hr

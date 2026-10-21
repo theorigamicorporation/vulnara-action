@@ -132,6 +132,7 @@ jobs:
           tenant: my-tenant
           scan-tools: 11111111-2222-3333-4444-555555555555   # from `vulnara docker_scan_tools`; comma-separate for several
           fail-on: high             # fail the build on High or Critical findings
+          fail-on-exploited: kev    # and on any CVE in the CISA Known Exploited Vulnerabilities catalogue
           # branch defaults to the branch that triggered the workflow
           # git-token-id: <id>      # required for private repositories
 ```
@@ -195,6 +196,8 @@ every refusal.
 | `repository` | no | current repo | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repositories). |
 | `fail-on` | no | `critical` | Fail at or above: `none` \| `low` \| `medium` \| `high` \| `critical`. |
+| `fail-on-exploited` | no | `none` | Also fail on exploited findings: `none` \| `kev` \| `likely`. |
+| `epss-threshold` | no | `0.1` | EPSS probability that `likely` fails at or above. |
 | `create-issue` | no | `false` | Open an issue for findings. |
 | `auto-remediate` | no | `false` | Open a fix pull request (requires `create-issue`). |
 | `wait-timeout` | no | `1800` | Max seconds to wait, **per scan**. |
@@ -207,7 +210,7 @@ every refusal.
 | `token-url` | no | prod | OAuth token endpoint. |
 | `oauth-client-id` | no | prod | OAuth client id for the token exchange. |
 
-Outputs (`scan-result-ids`, `highest-severity`, `passed`, `web-target-id`, `web-scan-result-id`), validation rules and the runner
+Outputs (`scan-result-ids`, `highest-severity`, `passed`, `exploited-count`, `kev-count`, `web-target-id`, `web-scan-result-id`), validation rules and the runner
 environment the action reads: [docs/configuration.md](docs/configuration.md).
 
 > **Working on this action?** It is driven by [just](https://just.systems/). Run `just` for the
