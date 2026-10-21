@@ -210,7 +210,7 @@ every refusal.
 | `token-url` | no | prod | OAuth token endpoint. |
 | `oauth-client-id` | no | prod | OAuth client id for the token exchange. |
 
-Outputs (`scan-result-ids`, `highest-severity`, `passed`, `web-target-id`, `web-scan-result-id`), validation rules and the runner
+Outputs (`scan-result-ids`, `highest-severity`, `passed`, `exploited-count`, `kev-count`, `web-target-id`, `web-scan-result-id`), validation rules and the runner
 environment the action reads: [docs/configuration.md](docs/configuration.md).
 
 > **Working on this action?** It is driven by [just](https://just.systems/). Run `just` for the

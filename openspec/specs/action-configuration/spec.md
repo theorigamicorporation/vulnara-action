@@ -11,10 +11,12 @@ abort the run with a clear GitHub error annotation rather than a partial scan.
 ### Requirement: Declare the action interface
 The system SHALL publish an `action.yml` that declares the action as a Docker container
 action built from the repository `Dockerfile`, with the inputs `service-account`, `token`,
-`tenant`, `scan-tools`, `branch`, `repository`, `git-token-id`, `fail-on`, `create-issue`,
+`tenant`, `scan-tools`, `branch`, `repository`, `git-token-id`, `fail-on`, `fail-on-exploited`,
+`epss-threshold`, `create-issue`,
 `auto-remediate`, `wait-timeout`, `poll-interval`, `app-url`, `gateway-url`, `token-url`,
 `oauth-client-id`, `web-target-id`, `web-url` and `web-ownership-consent`, and the outputs
-`scan-result-ids`, `highest-severity`, `passed`, `web-target-id` and `web-scan-result-id`.
+`scan-result-ids`, `highest-severity`, `passed`, `exploited-count`, `kev-count`, `web-target-id` and
+`web-scan-result-id`.
 
 #### Scenario: Action metadata is resolvable by GitHub
 - **WHEN** a workflow references the action with `uses: theorigamicorporation/vulnara-action@v1`
@@ -69,8 +71,9 @@ trailing slash is stripped from `app-url`.
 The system SHALL abort with a `::error::` annotation and a non-zero exit code when
 `service-account`, `token` or `tenant` is empty, when `scan-tools` is empty and no web input is
 set, when `scan-tools` is set and the repository or branch could not be determined, or when
-`fail-on` is not one of `none`, `low`, `medium`, `high` or `critical`. The `fail-on` value is
-compared case-insensitively.
+`fail-on` is not one of `none`, `low`, `medium`, `high` or `critical`, when `fail-on-exploited` is
+not one of `none`, `kev` or `likely`, or when `epss-threshold` is not a number from 0 to 1. The
+`fail-on` and `fail-on-exploited` values are compared case-insensitively.
 
 #### Scenario: Missing required input
 - **WHEN** the `token` input is empty
@@ -98,6 +101,14 @@ compared case-insensitively.
 #### Scenario: Uppercase fail-on value accepted
 - **WHEN** `fail-on` is set to `HIGH`
 - **THEN** the value is lowercased and the gate threshold is the `high` rank
+
+#### Scenario: Invalid fail-on-exploited value
+- **WHEN** `fail-on-exploited` is set to `always`
+- **THEN** the action fails with an error naming the accepted values `none|kev|likely`
+
+#### Scenario: Invalid epss-threshold value
+- **WHEN** `epss-threshold` is set to `10%`
+- **THEN** the action fails with an error naming `epss-threshold`
 
 ### Requirement: Coerce boolean inputs by exact match
 The system SHALL treat `create-issue` and `auto-remediate` as true only when the
