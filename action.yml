@@ -35,6 +35,14 @@ inputs:
     description: 'Fail the job if a finding at or above this severity is found: none | low | medium | high | critical.'
     required: false
     default: 'critical'
+  fail-on-exploited:
+    description: 'Also fail the job on actively exploited findings in this run: none | kev (CVE in the CISA Known Exploited Vulnerabilities catalogue) | likely (KEV, or an EPSS score at or above epss-threshold). Findings with a recorded triage decision are skipped.'
+    required: false
+    default: 'none'
+  epss-threshold:
+    description: 'EPSS probability (0 to 1) at or above which fail-on-exploited: likely fails the job.'
+    required: false
+    default: '0.1'
   create-issue:
     description: 'Create an issue in the repository for findings.'
     required: false
@@ -86,7 +94,11 @@ outputs:
   highest-severity:
     description: 'The highest finding severity discovered across the scans (or "none").'
   passed:
-    description: '"true" if the scans passed the fail-on gate, "false" otherwise.'
+    description: '"true" if the scans passed the fail-on and fail-on-exploited gates, "false" otherwise.'
+  exploited-count:
+    description: 'Actively exploited findings in this run that fail-on-exploited counts (0 when it is none).'
+  kev-count:
+    description: 'How many of those are in the CISA KEV catalogue.'
   web-target-id:
     description: 'Id of the web target that was scanned, when a web application scan ran.'
   web-scan-result-id:

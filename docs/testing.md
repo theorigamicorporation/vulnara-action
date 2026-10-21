@@ -6,7 +6,7 @@
 ./test/run-tests.sh
 ```
 
-**78 tests.** They need only `bash` and `jq`, both already in the action image. `curl` and `sleep`
+**86 tests.** They need only `bash` and `jq`, both already in the action image. `curl` and `sleep`
 are stubbed on `PATH`, so nothing reaches the network and no Vulnara account is required. See
 [test/README.md](../test/README.md) for the layout and how to add a case.
 

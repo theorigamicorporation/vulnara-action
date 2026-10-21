@@ -17,6 +17,8 @@ the outputs it writes.
 | `repository` | no | `GITHUB_REPOSITORY` | `owner/name` to resolve in Vulnara. Azure DevOps also takes `org/project/repo` or `project/repo`. See [Reference](reference.md#resolving-the-repository). |
 | `git-token-id` | no | | Vulnara git token id. Required for private repositories. |
 | `fail-on` | no | `critical` | Fail at or above: `none` \| `low` \| `medium` \| `high` \| `critical`. See [the gate](reference.md#the-severity-gate). |
+| `fail-on-exploited` | no | `none` | Also fail on actively exploited findings in this run: `none` \| `kev` (CVE in CISA KEV) \| `likely` (KEV, or EPSS at or above `epss-threshold`). Findings with a recorded triage decision are skipped. See [the exploited gate](reference.md#the-exploited-gate). |
+| `epss-threshold` | no | `0.1` | EPSS probability, 0 to 1, that `likely` fails at or above. |
 | `create-issue` | no | `false` | Ask Vulnara to open an issue for findings. |
 | `auto-remediate` | no | `false` | Ask Vulnara to open a fix pull request. Requires `create-issue`. |
 | `wait-timeout` | no | `1800` | Max seconds to wait for a scan. Applied **per scan**, not per run. |
@@ -49,6 +51,8 @@ Validation happens before the first network call.
 | `web-url` not `http(s)://` | `::error::web-url '<value>' is not an http(s) URL` |
 | `web-url` set, `web-ownership-consent` not exactly `true` | `::error::web-url requires web-ownership-consent: true. ...` |
 | `fail-on` not one of the five accepted values | `::error::invalid fail-on '<value>' (expected none\|low\|medium\|high\|critical)` |
+| `fail-on-exploited` not `none`, `kev` or `likely` | `::error::invalid fail-on-exploited '<value>' (expected none\|kev\|likely)` |
+| `epss-threshold` not a number from 0 to 1 | `::error::invalid epss-threshold '<value>' (expected a number from 0 to 1)` |
 
 `create-issue`, `auto-remediate` and `web-ownership-consent` are compared literally against
 `true`; any other value, including `TRUE`, is treated as false.
@@ -72,7 +76,9 @@ runnable outside Actions, provided `branch` and `repository` are passed explicit
 |---|---|
 | `scan-result-ids` | Space-separated ids of the repository scan results that were started. Empty if none started. |
 | `highest-severity` | Highest severity found across all scans, lower case, or `none`. |
-| `passed` | `true` if the run passed the `fail-on` gate, `false` otherwise. |
+| `passed` | `true` if the run passed the `fail-on` and `fail-on-exploited` gates, `false` otherwise. |
+| `exploited-count` | Exploited findings in this run that `fail-on-exploited` counted; `0` when it is `none`. |
+| `kev-count` | How many of those are in CISA KEV. |
 | `web-target-id` | Id of the web target that was scanned. Written only when a web application scan ran. |
 | `web-scan-result-id` | Id of the web application scan result. Written only when one ran. `scan-result-ids` stays repository scans only. |
 
