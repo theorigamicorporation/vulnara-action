@@ -80,7 +80,8 @@ point there.
 3. **Run `just ci` before pushing.** It covers `tests.yml`, which is lint, the suite and the
    image build, so a failure here is a failure there, found in seconds instead of minutes. It
    does **not** cover `openspec.yml`, which also blocks a merge: run `just specs` as well. Every
-   workflow here runs on `ubuntu-latest`, not a self-hosted runner set.
+   workflow here runs on the self-hosted ARC runner set `o4-k8s-runner-set-o4`, whose image has
+   no shellcheck, node or python until a step installs them.
 4. **Use the tools the repository names, never a substitute.** There is nothing to pin and
    nothing to provision here: `just setup` only reports whether `bash`, `jq`, `shellcheck` and
    `docker` are present, and `scripts/openspec_badges.py` runs on the system `python3`. This

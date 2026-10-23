@@ -15,7 +15,7 @@ permissions:
 jobs:
   badges:
     name: Regenerate OpenSpec badges
-    runs-on: ubuntu-latest
+    runs-on: o4-k8s-runner-set-o4
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 

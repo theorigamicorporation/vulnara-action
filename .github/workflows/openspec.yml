@@ -18,7 +18,7 @@ permissions:
 jobs:
   validate:
     name: Validate specs
-    runs-on: ubuntu-latest
+    runs-on: o4-k8s-runner-set-o4
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
@@ -53,7 +53,7 @@ jobs:
     # a red default branch would report the same backlog to everyone at once
     # without giving anybody a diff to fix it in.
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: o4-k8s-runner-set-o4
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
