@@ -130,9 +130,11 @@ ensure_jwt() {
     --data-urlencode "username=$SERVICE_ACCOUNT" \
     --data-urlencode "password=$TOKEN" \
     --data-urlencode "scope=profile")"
-  JWT="$(echo "$resp" | jq -r '.access_token // empty')"
+  JWT="$(echo "$resp" | jq -r '.access_token // empty' 2>/dev/null || true)"
   if [ -z "$JWT" ]; then
-    echo "$resp" | jq -r '.error_description // .error // .' >&2
+    # The provider's own error fields only: any other body, such as a proxy's
+    # error page, can carry hosts and ids that do not belong in a public log.
+    echo "$resp" | jq -r '.error_description // .error // empty' >&2 2>/dev/null || true
     fail "could not authenticate the service account (check service-account/token/tenant)"
   fi
   local exp; exp="$(echo "$resp" | jq -r '.expires_in // 3600')"

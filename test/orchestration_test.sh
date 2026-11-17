@@ -69,6 +69,27 @@ J
   assert_eq "0" "$(graphql_count)" "no GraphQL request after a failed token exchange"
 }
 
+# spec: scan-orchestration / Requirement: Authenticate the service account /
+#       Scenario: Invalid credentials
+# Only the provider's error fields are printed. A body without them, such as an
+# error page from something in front of the provider, is never echoed.
+test_unrecognised_token_response_is_not_echoed() {
+  fixture token.json <<'J'
+<html><body>502 Bad Gateway upstream=10.0.0.7 node=edge-internal-03</body></html>
+J
+  run_action
+  assert_failure "an unusable token response must fail the job"
+  assert_not_contains "$ERR" "edge-internal-03" "the raw body is not printed"
+  assert_not_contains "$ERR" "10.0.0.7" "nor any address in it"
+  assert_contains "$ERR" "::error::could not authenticate the service account" "the failure is still explained"
+  fixture token.json <<'J'
+{"detail":"proxy at 10.0.0.7 refused","trace":"edge-internal-03"}
+J
+  run_action
+  assert_failure "a JSON body without error fields must fail the job"
+  assert_not_contains "$ERR" "edge-internal-03" "a JSON body without error fields is not printed either"
+}
+
 # spec: scan-orchestration / Requirement: Send tenant-scoped GraphQL requests
 test_graphql_requests_are_tenant_scoped_json_posts() {
   run_action
