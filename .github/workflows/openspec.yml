@@ -18,7 +18,7 @@ permissions:
 jobs:
   validate:
     name: Validate specs
-    runs-on: o4-k8s-runner-set-o4
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
@@ -53,7 +53,7 @@ jobs:
     # a red default branch would report the same backlog to everyone at once
     # without giving anybody a diff to fix it in.
     if: github.event_name == 'pull_request'
-    runs-on: o4-k8s-runner-set-o4
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
@@ -105,8 +105,8 @@ jobs:
 
             # The escape hatch. Some completed changes genuinely cannot be
             # archived yet because something outside this repository has to
-            # happen first: a deploy, a live-cluster verification, a sibling
-            # service serving the endpoint. Those record the blocker in
+            # happen first, such as a release or another service serving the
+            # endpoint. Those record the blocker in
             # PARKED.md rather than reopening a task that is actually done.
             if [ -f "$dir/PARKED.md" ]; then
               echo "parked: $change - $(sed -n '/[^[:space:]]/{p;q;}' "$dir/PARKED.md")"
