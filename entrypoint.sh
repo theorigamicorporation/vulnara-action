@@ -232,8 +232,8 @@ looks_like_id() {
 # customer surface, and a workflow log on a public repository is one of those.
 # The fallback is `Uncategorised`: display only. It is never stored, never
 # filtered on, and is not a category the platform knows about.
-# `dast` is named ahead of any scanner serving it (OpenProject #1292), so the
-# first scan that covers it is not labelled `Uncategorised`.
+# `dast` is named ahead of any scanner serving it, so the first scan that covers
+# it is not labelled `Uncategorised`.
 category_display() {
   case "$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')" in
     sast)    printf 'Code analysis' ;;
@@ -270,7 +270,7 @@ categories_display() { # comma-separated wire values -> display label
 # scanner name.
 #
 # `.categories` is still narrowable. `gateway-url` is an action input, so a
-# non-prod or self-hosted gateway predating that field is a real deployment, and
+# non-prod gateway predating that field is a real deployment, and
 # selecting it unconditionally would turn "labelled Uncategorised" into "the run
 # fails and starts no scan" for a tool id pinned in a workflow file we do not
 # control. Narrow the selection from the validation error and retry instead.

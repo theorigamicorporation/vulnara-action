@@ -3,7 +3,7 @@
 ### Requirement: Never print a scanner's stored name
 
 **Reason**: it forbade the stored name but mandated a mapping from it to a product name, and that
-mapping is what put `Ripley`, `Bishop`, `Hicks` and `Ash` into every run's log and job summary. A
+mapping is what put the retired scanner names into every run's log and job summary. A
 codename is a scanner identity, and no scanner identity reaches a customer surface. Replaced by
 `Never identify a scanner to the caller`, which fixes the label on the category instead.
 

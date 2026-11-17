@@ -44,9 +44,6 @@ Point a workflow at your branch and override the four environment inputs togethe
           oauth-client-id: <non-prod client id>
 ```
 
-For a gateway to develop against, see
-[vulnara-dev](https://github.com/theorigamicorporation/vulnara-dev).
-
 ## Conventions
 
 - Build every GraphQL body with `jq -n` so values are JSON-encoded. Never interpolate an input

@@ -17,7 +17,7 @@ flowchart LR
     WF["GitHub workflow"]
     ACT["vulnara-action<br/>entrypoint.sh"]
     IDP["Vulnara identity provider<br/>token-url"]
-    GW["vulnara-gateway-api<br/>gateway-url"]
+    GW["Vulnara gateway<br/>gateway-url"]
     SCAN["Vulnara scanners"]
     APP["Vulnara web app<br/>app-url"]
 

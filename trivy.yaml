@@ -1,13 +1,12 @@
 # Trivy scan configuration.
 #
-# Auto-detected from the working directory, so `xxsec-scan-trivy .` and a plain
-# `trivy fs .` both pick it up with no extra flags.
+# Auto-detected from the working directory, so a plain `trivy fs .` picks it up
+# with no extra flags.
 #
 # This only excludes build artefacts and installed dependency trees. It does not
 # suppress findings: Trivy reads dependency vulnerabilities from lockfiles and
 # manifests, not from the installed tree, so skipping node_modules and .venv
-# changes nothing about what is reported. Verified against vulnara-frontend,
-# where the counts are identical with and without this file.
+# changes nothing about what is reported.
 #
 # The reason it exists: these directories contain fixtures and cached test names
 # that match secret patterns. A pytest cache holding

@@ -12,7 +12,7 @@ resolve scanners by name, states that a category label belongs to a category sca
 `scan-tools`, and points at where the ids are listed. It SHALL NOT report a non-id entry as
 unavailable to the tenant, which sends the caller to look for a scanner that is present.
 
-Where a failure points the caller at the ids, it SHALL name vulnara-cli's `docker_scan_tools`
+Where a failure points the caller at the ids, it SHALL name the Vulnara CLI's `docker_scan_tools`
 command and the `dockerScanTools { id categories }` query. The Vulnara application has no screen
 listing scanner ids, so a message sending the caller there sends them nowhere.
 

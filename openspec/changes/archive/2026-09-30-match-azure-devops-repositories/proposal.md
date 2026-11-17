@@ -1,9 +1,9 @@
 ## Why
 
 `resolve_repository` filters `repositories` on the last segment of `owner/name` and matches the
-owner against `gitEntity.name`. vulnara-api stores an Azure DevOps repository as
+owner against `gitEntity.name`. Vulnara stores an Azure DevOps repository as
 `repositoryName = "{project}/{repo}"` under a git entity named after the Azure organization, so
-the name filter never returns it and an Azure repository cannot be resolved. Refs OP#1198.
+the name filter never returns it and an Azure repository cannot be resolved.
 
 ## What Changes
 

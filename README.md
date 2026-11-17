@@ -69,7 +69,7 @@ flowchart LR
     IN["with:<br/>4 required, 12 optional"]
     ACT["entrypoint.sh<br/>bash, curl, jq"]
     IDP["identity provider<br/>token-url"]
-    GW["vulnara-gateway-api<br/>gateway-url"]
+    GW["Vulnara gateway<br/>gateway-url"]
     SCAN["Vulnara scanners"]
     OUT["GITHUB_OUTPUT<br/>scan-result-ids<br/>highest-severity<br/>passed"]
     SUM["GITHUB_STEP_SUMMARY<br/>findings tables"]
@@ -223,7 +223,7 @@ environment the action reads: [docs/configuration.md](docs/configuration.md).
 |---|---|
 | [Architecture](docs/architecture.md) | Diagrams, components, the five-step flow, the request shape |
 | [Configuration](docs/configuration.md) | Every input, output, validation rule and environment variable |
-| [Reference](docs/reference.md) | The severity gate, the scanner codenames, the job summary contract |
+| [Reference](docs/reference.md) | The severity gate, the scan categories, the job summary contract |
 | [Troubleshooting](docs/troubleshooting.md) | Two known issues, then the common failures |
 | [Development](docs/development.md) | Local checks, non-prod runs, conventions, releasing |
 | [Testing](docs/testing.md) | The offline suite, the lint and build gates, the end-to-end cases |
@@ -233,17 +233,6 @@ Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. T
 remain: repository resolution falls back to the first result when no owner matches, so a
 same-named repository under another owner can be scanned instead, and `wait-timeout` bounds each
 scan rather than the run.
-
-## Related repositories
-
-Part of the [Vulnara](https://github.com/theorigamicorporation/vulnara-dev) platform.
-Start there for the local stack and the architecture overview.
-
-| Repo | Relationship |
-|---|---|
-| [vulnara-gateway-api](https://github.com/theorigamicorporation/vulnara-gateway-api) | The only API this action calls. Owns authentication, tenancy and every query and mutation used here |
-| [vulnara-cli](https://github.com/theorigamicorporation/vulnara-cli) | The terminal equivalent of this action against the same gateway |
-| [vulnara-dev](https://github.com/theorigamicorporation/vulnara-dev) | Local stack, for running a non-production gateway to develop against |
 
 ## Contributing
 

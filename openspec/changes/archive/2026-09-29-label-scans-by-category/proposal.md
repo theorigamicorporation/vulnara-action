@@ -1,19 +1,18 @@
 ## Why
 
 The previous change stopped the action printing a scanner's *stored* name. It left the map that
-turns that stored name into a codename, so every successful run still printed `Ripley`, `Bishop`,
-`Hicks` or `Ash` on the `tool` line, in `started '<name>'`, in the completion line and in two
-columns of the job summary. A workflow log is world-readable on a public repository. The owner
-has retired those codenames from customer surfaces entirely, and `vulnara-site` is removing the
-only public page that says what `Ripley` is, so a customer would read a codename in their own CI
-log with nowhere left to look it up.
+turns that stored name into a codename, so every successful run still printed one of the retired
+scanner names on the `tool` line, in `started '<name>'`, in the completion line and in two
+columns of the job summary. A workflow log is world-readable on a public repository. Those names
+are retired from customer surfaces entirely, so a customer would read a name in their own CI log
+with nowhere to look it up.
 
 The second problem is the query, not the printing. `resolve_tools` selects
 `dockerScanTools { id name }` unconditionally. `DockerScanTool.name` is being removed, and
 selecting a field the schema no longer has fails the *whole* query with
 `GRAPHQL_VALIDATION_FAILED`. Reproduced against a gateway answering that way: the run prints the
 validation error, then `::error::GraphQL request failed`, then
-`::error::scan tool 'AEGIS' is not available to tenant '...'`, and exits 1 having started nothing.
+`::error::scan tool '<name>' is not available to tenant '...'`, and exits 1 having started nothing.
 A `scan-tools` value pinned to an **id** fails identically, because the query dies before any
 matching happens. `scan-tools` lives in consumers' own workflow files, so on the day `name` is
 removed every pinned workflow breaks at once, and the annotation a customer reads blames their
@@ -66,8 +65,7 @@ None.
   `openspec/project.md`.
 - No change to the inputs, the outputs, the gate, or the shape of the job summary.
 - `action.yml` is deliberately unchanged: its `scan-tools` description is copied verbatim into
-  `vulnara-site`'s committed `action.json` snapshot by that repository's weekly docs sync, and the
-  two already agree.
+  the public documentation, and the two already agree.
 
 ## Quota
 

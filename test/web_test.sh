@@ -455,7 +455,7 @@ J
   run_action
   local all; all="$ERR$(summary)$(outputs)"
   local w
-  for w in nuclei Nuclei Hicks Ripley Bishop; do
+  for w in Kestrel Osprey Merlin; do
     assert_not_contains "$all" "$w" "'$w' never appears"
   done
   # the queries do not ask for one either

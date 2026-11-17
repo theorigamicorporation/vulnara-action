@@ -326,7 +326,7 @@ test_category_display_uses_the_shared_vocabulary() {
 test_category_display_falls_back_to_uncategorised() {
   assert_eq "Uncategorised" "$(prelude_call category_display '')"           "no category"
   assert_eq "Uncategorised" "$(prelude_call category_display iac)"          "a category this action does not know"
-  assert_eq "Uncategorised" "$(prelude_call category_display AEGIS)"        "a scanner name is not a category"
+  assert_eq "Uncategorised" "$(prelude_call category_display Kestrel)"      "a scanner name is not a category"
   assert_eq "Uncategorised" "$(prelude_call categories_display '')"         "an empty category set"
 }
 
@@ -342,16 +342,16 @@ test_categories_display_joins_and_deduplicates() {
 }
 
 # spec: scan-orchestration / Requirement: Never identify a scanner to the caller
-# The codenames are retired from every customer surface. This asserts on the
+# Scanner names are retired from every customer surface. This asserts on the
 # source rather than on a run, because a mapping that exists is a mapping that
-# will be printed by the next line someone adds.
-test_no_scanner_codename_appears_in_the_action() {
+# will be printed by the next line someone adds: the only display mapping is the
+# category one, and it knows the five category wire values and nothing else.
+test_no_scanner_name_mapping_appears_in_the_action() {
   local src; src="$(cat "$ENTRYPOINT")"
-  for codename in Ripley Bishop Hicks; do
-    assert_not_contains "$src" "$codename" "the action must not carry the codename '$codename'"
-  done
-  assert_eq "0" "$(grep -cE '\bAsh\b' "$ENTRYPOINT" || true)" "the action must not carry the codename 'Ash'"
   assert_not_contains "$src" "scanner_display" "the scanner-name mapping must be gone, not renamed"
+  local arms
+  arms="$(sed -n '/^category_display()/,/^}/p' "$ENTRYPOINT" | grep -oE '^ +[a-z*]+\)' | tr -d ' )' | sort | tr '\n' ' ')"
+  assert_eq "* dast pii sast sca secrets " "$arms" "category_display maps the category wire values only"
 }
 
 # spec: scan-orchestration / Requirement: Never identify a scanner to the caller

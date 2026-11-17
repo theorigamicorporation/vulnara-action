@@ -25,4 +25,4 @@
 
 - [x] 5.1 `./test/run-tests.sh`
 - [x] 5.2 `openspec validate --specs --strict`
-- [x] 5.3 Validate every operation the action sends against `vulnara-gateway-api` `c3648c96`
+- [x] 5.3 Validate every operation the action sends against the gateway schema

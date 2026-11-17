@@ -1,7 +1,6 @@
 ## Why
 
-Web application scanning is in beta on the platform (OpenProject #1301, part of the DAST beta
-under #778): a workspace registers a web target, starts a web scan of it and triages the
+Web application scanning is in beta on the platform: a workspace registers a web target, starts a web scan of it and triages the
 findings. The natural place to run one from CI is right after a preview or staging deploy, and
 today the action can only scan a repository. A team that wants the deployed application checked
 on every pull request has to script the gateway themselves, and has nothing that gates the build

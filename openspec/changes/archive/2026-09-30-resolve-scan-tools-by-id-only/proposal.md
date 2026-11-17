@@ -1,23 +1,23 @@
 ## Why
 
-`DockerScanTool.name` is gone from the gateway (`vulnara-gateway-api` `c3648c96`, owner decision 3),
-not deprecated. The adaptive selection added in this PR was written for the moment it disappeared,
-and it works: verified against that commit's composed SDL, `{dockerScanTools(list:{}){items{id name
+`DockerScanTool.name` is gone from the gateway, not deprecated. The adaptive selection added in
+this PR was written for the moment it disappeared, and it works: verified against the gateway
+schema without the field, `{dockerScanTools(list:{}){items{id name
 categories}}}` fails with `Cannot query field "name" on type "DockerScanTool".`, the narrowing
 matches that message, and the retried `{dockerScanTools(list:{}){items{id categories}}}` is valid.
 
 Working is not the same as worth keeping. Tolerating both shapes of `name` now means every run pays
 a rejected request before its real one, forever, because attempt one can never succeed again. And
-the only thing `name` was ever used for was matching a name-valued `scan-tools`, which owner
-decision 3 retires: a name cannot be resolved, so the action should say so rather than ask for a
+the only thing `name` was ever used for was matching a name-valued `scan-tools`, which is now
+retired: a name cannot be resolved, so the action should say so rather than ask for a
 field it must not print.
 
-`categories` is the opposite case. `gateway-url` is an action input, so a non-prod or self-hosted
+`categories` is the opposite case. `gateway-url` is an action input, so a non-prod
 gateway predating `DockerScanTool.categories` is a real deployment, and selecting that field
 unconditionally there turns "labelled Uncategorised" into "the run fails and starts no scan" for a
 tool id pinned in a workflow file we do not control.
 
-Separately, `scan-tools: AEGIS` used to succeed silently. With `name` gone it cannot resolve, and
+Separately, a scanner name in `scan-tools` used to succeed silently. With `name` gone it cannot resolve, and
 before this change the run reported `is not available to tenant`, sending the customer to look in the
 Vulnara UI for a scanner that is there.
 
@@ -51,6 +51,5 @@ None.
 - `entrypoint.sh`, `action.yml`, `README.md`, `docs/configuration.md`, `docs/development.md`,
   `docs/reference.md`, `test/orchestration_test.sh`, `test/reporting_test.sh`,
   `test/lib/harness.sh`, `test/fixtures/base/dockerScanTools.json`.
-- `vulnara-site`: `src/docs/data/action.json` is generated from `action.yml` by the weekly
-  `docs-sync` workflow, so #477's committed snapshot of the `scan-tools` description goes stale and
+- The public documentation copies the `scan-tools` description from `action.yml`, so its copy
   has to be regenerated.

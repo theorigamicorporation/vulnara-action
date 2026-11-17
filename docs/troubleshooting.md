@@ -68,7 +68,7 @@ lacks access to that repository or tool.
 
 The action warns `repository is private but no git-token-id was provided` and starts the scan
 anyway. The scan then fails on the platform side and the job fails with
-`scan for '<codename>' ended as FAILED`. Pass a valid `git-token-id`.
+`scan for '<category>' ended as FAILED`. Pass a valid `git-token-id`.
 
 ### `repository ... is disabled in Vulnara`
 
@@ -103,7 +103,7 @@ network or on an internal host name cannot be.
 
 More than one web target has that base URL. Pass the one to scan as `web-target-id`.
 
-### `timed out after <n>s waiting for '<codename>'`
+### `timed out after <n>s waiting for '<category>'`
 
 The scan did not reach a terminal state inside `wait-timeout`. The scan itself keeps running on
 the platform; open it at `<app-url>/repository-scans/<id>` to see where it got to, and raise
