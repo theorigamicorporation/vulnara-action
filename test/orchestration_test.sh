@@ -144,8 +144,31 @@ J
 }
 
 # spec: scan-orchestration / Requirement: Resolve the repository in Vulnara /
-#       Scenario: Repository resolved and reported
-test_repository_falls_back_to_the_first_item_when_no_owner_matches() {
+#       Scenario: No returned repository belongs to the requested owner
+test_repository_under_other_owners_fails_and_names_them() {
+  fixture repositories.json <<'J'
+{"data":{"repositories":{"items":[
+  {"id":"repo-other","repositoryName":"widgets","private":false,"enabled":true,
+   "programmingLanguage":[],"cloneUrl":"https://git.example.test/other/widgets.git",
+   "gitEntity":{"__typename":"GitUser","name":"other","gitType":"github","htmlUrl":null}},
+  {"id":"repo-third","repositoryName":"widgets","private":false,"enabled":true,
+   "programmingLanguage":[],"cloneUrl":"https://git.example.test/third/widgets.git",
+   "gitEntity":{"__typename":"Organization","name":"third","gitType":"github","htmlUrl":"https://git.example.test/third"}}
+]}}}
+J
+  run_action
+  assert_failure "a repository under another owner must not be scanned in place of the requested one"
+  assert_contains "$ERR" "::error::repository 'acme/widgets' was not found under 'acme' in Vulnara (tenant 'tenant-abc')." \
+    "names the requested owner/name and the tenant"
+  assert_contains "$ERR" "A repository named 'widgets' exists under these workspaces: other, third." "names the owners that came back"
+  assert_not_contains "$ERR" "repo-other" "no other repository is resolved"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the repository in Vulnara /
+#       Scenario: No returned repository belongs to the requested owner
+# One candidate under another owner is still a guess, so it fails the same way.
+test_single_repository_under_another_owner_fails() {
   fixture repositories.json <<'J'
 {"data":{"repositories":{"items":[
   {"id":"repo-first","repositoryName":"widgets","private":false,"enabled":true,
@@ -154,9 +177,24 @@ test_repository_falls_back_to_the_first_item_when_no_owner_matches() {
 ]}}}
 J
   run_action
+  assert_failure "a single non-matching candidate must not be used"
+  assert_contains "$ERR" "exists under these workspaces: other." "names the returned owner"
+  assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"
+}
+
+# spec: scan-orchestration / Requirement: Resolve the repository in Vulnara /
+#       Scenario: Repository resolved and reported
+test_repository_url_falls_back_to_clone_url_and_languages_to_na() {
+  fixture repositories.json <<'J'
+{"data":{"repositories":{"items":[
+  {"id":"repo-1111","repositoryName":"widgets","private":false,"enabled":true,
+   "programmingLanguage":null,"cloneUrl":"https://git.example.test/acme/widgets.git",
+   "gitEntity":{"__typename":"GitUser","name":"acme","gitType":"github","htmlUrl":null}}
+]}}}
+J
+  run_action
   assert_success
-  assert_info "Vulnara id" "repo-first" "first item used as fallback"
-  assert_info "URL" "https://git.example.test/other/widgets" "cloneUrl fallback drops the .git suffix"
+  assert_info "URL" "https://git.example.test/acme/widgets" "cloneUrl fallback drops the .git suffix"
   assert_info "Languages" "n/a" "no languages reported as n/a"
 }
 

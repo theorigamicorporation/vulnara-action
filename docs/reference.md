@@ -115,8 +115,9 @@ scan tool 'my-scanner' is not a scan tool id. scan-tools takes ids: this Vulnara
 
 `repository` defaults to `GITHUB_REPOSITORY`. The action first looks the repository up by the
 last segment of `repository` and takes the candidate whose git entity name equals the first
-segment, case-insensitively. That is the whole rule for GitHub, GitLab, Bitbucket and Forgejo,
-apart from the [first-result fallback](troubleshooting.md#the-wrong-repository-is-scanned).
+segment, case-insensitively. That is the whole rule for GitHub, GitLab, Bitbucket and Forgejo.
+When candidates come back but none is under that owner, the run fails and lists the owners it
+found, rather than scanning a same-named repository elsewhere.
 
 Vulnara stores an Azure DevOps repository as `<project>/<repo>` under a git entity named after
 the Azure organization, so when the first lookup finds no owner match the action searches for

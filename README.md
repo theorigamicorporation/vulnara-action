@@ -44,7 +44,7 @@ Five numbered steps, each printed to the log with a `vulnara:` prefix.
    `token` for a JWT, refreshed automatically 120 seconds before it expires so a long scan does
    not fail.
 2. **Resolve the repository.** Looked up by name in Vulnara and matched on the owner half of
-   `repository`. Warns if the repository is disabled, or private with no `git-token-id`.
+   `repository`; no match under that owner fails the run. Warns if the repository is disabled, or private with no `git-token-id`.
 3. **Resolve the scanners.** Each entry in `scan-tools` is matched against a tool id. Names
    are not accepted.
 4. **Start and await the scans.** One scan per scanner, all started up front, then polled every
@@ -224,15 +224,13 @@ environment the action reads: [docs/configuration.md](docs/configuration.md).
 | [Architecture](docs/architecture.md) | Diagrams, components, the five-step flow, the request shape |
 | [Configuration](docs/configuration.md) | Every input, output, validation rule and environment variable |
 | [Reference](docs/reference.md) | The severity gate, the scan categories, the job summary contract |
-| [Troubleshooting](docs/troubleshooting.md) | Two known issues, then the common failures |
+| [Troubleshooting](docs/troubleshooting.md) | One known issue, then the common failures |
 | [Development](docs/development.md) | Local checks, non-prod runs, conventions, releasing |
 | [Testing](docs/testing.md) | The offline suite, the lint and build gates, the end-to-end cases |
 | [Specifications](openspec/specs/) | The normative behaviour: 4 capabilities, 24 requirements, 87 scenarios |
 
-Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. Two known issues
-remain: repository resolution falls back to the first result when no owner matches, so a
-same-named repository under another owner can be scanned instead, and `wait-timeout` bounds each
-scan rather than the run.
+Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. One known issue
+remains: `wait-timeout` bounds each scan rather than the run.
 
 ## Contributing
 

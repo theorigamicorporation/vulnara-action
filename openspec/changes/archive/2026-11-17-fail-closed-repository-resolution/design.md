@@ -29,8 +29,7 @@ asked for was not the owner they got.
 ## Decisions
 
 **Fail rather than warn.** A `::warning::` keeps the wrong scan running and still exits 0 on a
-clean result, which is the same failure mode as A3.2: an annotation nobody reads on a green
-job. The gate exists to stop the build, so it stops.
+clean result: an annotation nobody reads on a green job. The gate exists to stop the build, so it stops.
 
 **Fail on a single non-matching item too.** The alternative, "fall back only when exactly one
 item comes back", is tempting because the common cause is a renamed git entity rather than a

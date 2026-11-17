@@ -195,7 +195,9 @@ resolve_repository() {
       fail "repository '$REPOSITORY' is ambiguous in Vulnara (tenant '$TENANT'): $(echo "$azure" | jq -r '[.[] | "\(.gitEntity.name)/\(.repositoryName)"] | join(", ")'). Pass the full org/project/repo."
     fi
     item="$(echo "$azure" | jq -c '.[0] // empty')"
-    [ -n "$item" ] || item="$(echo "$data" | jq -c '.repositories.items[0] // empty')"
+  fi
+  if [ -z "$item" ] && [ "$(echo "$data" | jq '.repositories.items | length')" -gt 0 ]; then
+    fail "repository '$REPOSITORY' was not found under '$owner' in Vulnara (tenant '$TENANT'). A repository named '$name' exists under these workspaces: $(echo "$data" | jq -r '[.repositories.items[] | .gitEntity.name // "?"] | unique | join(", ")'). Check the repository input, or that the workspace in Vulnara is named after the git owner."
   fi
   [ -n "$item" ] || fail "repository '$REPOSITORY' was not found in Vulnara (tenant '$TENANT'). Add it in Vulnara first."
   REPO_ID="$(echo "$item" | jq -r '.id')"

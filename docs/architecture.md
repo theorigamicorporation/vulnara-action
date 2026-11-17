@@ -93,7 +93,7 @@ sequenceDiagram
    candidates; the action picks the one whose git entity name matches the owner half of
    `repository`, case-insensitively. It prints the Vulnara id, provider, visibility, languages
    and enabled flag, and warns if the repository is disabled, or private with no
-   `git-token-id`. See [the resolution caveat](troubleshooting.md#the-wrong-repository-is-scanned).
+   `git-token-id`. When no candidate is under that owner, the run fails before any scan starts.
 3. **Resolve the scanners.** The scan tool catalogue is queried once, with its selection set narrowed
    to the fields the schema actually has, and each entry in `scan-tools` is matched against a
    tool id; names are not accepted. An unknown entry aborts

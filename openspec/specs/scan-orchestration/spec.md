@@ -47,10 +47,10 @@ build all request bodies with `jq -n` so input values are JSON-encoded.
 
 ### Requirement: Resolve the repository in Vulnara
 The system SHALL query `repositories` filtered by `repositoryName` equal to the name part of
-the `owner/name` repository input, and select the item whose `gitEntity.name` matches the
-owner case-insensitively, falling back to the first returned item. It SHALL record the
-repository id, full name, provider (`gitType`), visibility, enabled flag, programming
-languages and browsing URL.
+the `owner/name` repository input, and select the item whose `gitEntity.name` matches the owner
+case-insensitively. It SHALL NOT fall back to another item when no `gitEntity.name` matches the
+owner. It SHALL record the repository id, full name, provider (`gitType`), visibility, enabled
+flag, programming languages and browsing URL.
 
 #### Scenario: Repository resolved and reported
 - **WHEN** the query returns a repository whose `gitEntity.name` matches the owner
@@ -63,6 +63,13 @@ languages and browsing URL.
 - **WHEN** the query returns no items
 - **THEN** the action fails with a message stating the repository was not found in Vulnara
   for the tenant and that it must be added first
+
+#### Scenario: No returned repository belongs to the requested owner
+- **WHEN** the query returns one or more items and none has a `gitEntity.name` equal to the
+  owner case-insensitively
+- **THEN** the action fails with a message naming the requested `owner/name` and the tenant,
+  and listing the `gitEntity.name` of every returned item
+- **AND** no scan is started
 
 #### Scenario: Repository is disabled
 - **WHEN** the resolved repository has `enabled: false`
@@ -235,9 +242,8 @@ when its `repositoryName` equals the input with the first segment removed and it
 `gitEntity.name` equals that first segment case-insensitively (`{org}/{project}/{repo}`), when
 its `repositoryName` equals the whole input (`{project}/{repo}`), or when its `gitEntity.name`
 equals the first segment case-insensitively and the last segment of its `repositoryName` equals
-the last segment of the input (`{org}/{repo}`). Exactly one match SHALL be resolved and SHALL
-take precedence over the fall back to the first returned item. More than one match SHALL fail
-the run. Items of any other `gitType` SHALL NOT be matched by this rule.
+the last segment of the input (`{org}/{repo}`). Exactly one match SHALL be resolved. More
+than one match SHALL fail the run. Items of any other `gitType` SHALL NOT be matched by this rule.
 
 #### Scenario: Azure repository matched by organization, project and name
 - **WHEN** `repository` is `acme/web/widgets` and Vulnara holds `web/widgets` under the
@@ -259,7 +265,8 @@ the run. Items of any other `gitType` SHALL NOT be matched by this rule.
 #### Scenario: Other providers are not matched by the Azure rule
 - **WHEN** the owner match finds nothing and the search returns only items whose `gitType` is
   not `azure_devops`
-- **THEN** resolution behaves as it did before this requirement
+- **THEN** no Azure DevOps item is resolved, and the run fails as described in `Resolve the
+  repository in Vulnara`
 
 ### Requirement: Build a browsing URL for every provider
 The system SHALL build the Azure DevOps browsing URL as `<htmlUrl>/<project>/_git/<repo>`

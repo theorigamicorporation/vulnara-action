@@ -35,10 +35,11 @@ None.
 
 - `scan-orchestration`: `Resolve the repository in Vulnara` drops the fall back to the first
   returned item and gains a scenario for the ambiguous / non-matching owner case.
+  `Match Azure DevOps repositories by project` no longer refers to that fallback.
 
 ## Impact
 
-- `entrypoint.sh:114-141` (`resolve_repository`), the `// (.repositories.items[0])` fallback.
+- `entrypoint.sh` (`resolve_repository`), the `.repositories.items[0]` fallback.
 - `test/orchestration_test.sh`: `test_repository_falls_back_to_the_first_item_when_no_owner_matches`
   is replaced by a failure test, and the `cloneUrl` / `programmingLanguage` assertions it also
   carried move to a fixture whose owner matches.
