@@ -418,8 +418,8 @@ test_unknown_tool_names_the_entry_not_the_roster() {
   run_action
   assert_contains "$ERR" "::error::scan tool '99999999-9999-9999-9999-999999999999' is not available to tenant 'tenant-abc'." \
     "names the rejected entry and the tenant"
-  assert_contains "$ERR" "'vulnara docker_scan_tools' (vulnara-cli)" "points at the CLI command that lists the ids"
-  assert_contains "$ERR" "'dockerScanTools { id categories }'" "and at the query behind it"
+  assert_contains "$ERR" "'vulnara docker_scan_tools' (the Vulnara CLI)" "points at the CLI command that lists the ids"
+  assert_contains "$ERR" "'scanTools { id categories }'" "and at the scan tool query"
   assert_failure "an unknown tool must fail the run"
   assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started once a tool cannot be resolved"
 }
@@ -521,8 +521,8 @@ test_a_name_valued_scan_tools_says_ids_are_required() {
     "the failure names the entry and says what is wrong with it"
   assert_contains "$ERR" "does not resolve scanners by name" \
     "it says the cause is the gateway no longer resolving names"
-  assert_contains "$ERR" "'vulnara docker_scan_tools' (vulnara-cli)" "points at the CLI command that lists the ids"
-  assert_contains "$ERR" "'dockerScanTools { id categories }'" "and at the query behind it"
+  assert_contains "$ERR" "'vulnara docker_scan_tools' (the Vulnara CLI)" "points at the CLI command that lists the ids"
+  assert_contains "$ERR" "'scanTools { id categories }'" "and at the scan tool query"
   assert_not_contains "$ERR" "shown against the scanner" "it does not send the user to a screen that does not exist"
   assert_not_contains "$ERR" "is not available to tenant" "it does not blame the tenant's availability"
   assert_eq "0" "$(graphql_count startRepositoryScan)" "no scan is started"

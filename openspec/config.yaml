@@ -28,7 +28,7 @@ context: |
 
   Integrations: OAuth2 client_credentials against the identity provider for the service-account
   JWT, then the Vulnara GraphQL gateway (X-Tenant header) for repositories,
-  dockerScanTools, startRepositoryScan, scanResult status polling and scanFindings.
+  scanTools (still requested as dockerScanTools), startRepositoryScan, scanResult status polling and scanFindings.
 
   Conventions: GraphQL bodies built with `jq -n`; inputs read via the input() helper
   (GitHub exposes them as INPUT_SERVICE-ACCOUNT with dashes); logs prefixed "vulnara:"

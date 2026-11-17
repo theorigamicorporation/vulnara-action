@@ -16,7 +16,7 @@ inputs:
     description: 'Vulnara tenant (workspace) id the service account belongs to.'
     required: true
   scan-tools:
-    description: 'Comma-separated scan tool ids to run on the repository. Names are not accepted. List the ids with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. Required unless web-target-id or web-url is set.'
+    description: 'Comma-separated scan tool ids to run on the repository. Names are not accepted. List the ids with `vulnara docker_scan_tools` (the Vulnara CLI) or the GraphQL query `scanTools { id categories }`. Required unless web-target-id or web-url is set.'
     required: false
     default: ''
   branch:

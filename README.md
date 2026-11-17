@@ -191,7 +191,7 @@ every refusal.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id. |
-| `scan-tools` | no | | Required unless a web input is set. Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. |
+| `scan-tools` | no | | Required unless a web input is set. Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (the Vulnara CLI) or the GraphQL query `scanTools { id categories }`. |
 | `branch` | no | triggering branch | Branch to scan. |
 | `repository` | no | current repo | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repositories). |

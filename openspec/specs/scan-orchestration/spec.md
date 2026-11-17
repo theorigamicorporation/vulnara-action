@@ -159,7 +159,7 @@ needs to know that what they asked for was rejected, not what else exists.
 - **AND** the tool's stored name appears in no log line, annotation, summary row or output
 
 ### Requirement: Resolve the requested scan tools by id
-The system SHALL read the `dockerScanTools` catalogue for the tenant and resolve every entry in
+The system SHALL read the scan tool catalogue for the tenant and resolve every entry in
 `scan-tools` to a tool id, failing the run with a message naming the rejected entry when an entry
 does not resolve. It SHALL map each matched tool to the category label it covers before the resolved
 list leaves the resolver, so that no caller holds a scanner identity to print.
@@ -170,11 +170,11 @@ resolve scanners by name, states that a category label belongs to a category sca
 `scan-tools`, and points at where the ids are listed. It SHALL NOT report a non-id entry as
 unavailable to the tenant, which sends the caller to look for a scanner that is present.
 
-Where a failure points the caller at the ids, it SHALL name vulnara-cli's `docker_scan_tools`
-command and the `dockerScanTools { id categories }` query. The Vulnara application has no screen
+Where a failure points the caller at the ids, it SHALL name the Vulnara CLI's `docker_scan_tools`
+command and the `scanTools { id categories }` query. The Vulnara application has no screen
 listing scanner ids, so a message sending the caller there sends them nowhere.
 
-The selection set SHALL NOT include `name`. The gateway has removed `DockerScanTool.name`, so
+The selection set SHALL NOT include `name`. The gateway has removed the scan tool `name` field, so
 requesting it would fail the whole query before any id was matched, and nothing in this action would
 print the value if it came back. `categories` SHALL remain optional: when the gateway rejects it with
 a field-level validation error, the field SHALL be dropped from the selection and the query retried,
@@ -188,7 +188,7 @@ not a rejected optional field SHALL still abort the run.
 - **AND** each resolved tool is listed under its category label alongside its id
 
 #### Scenario: The catalogue query requests no scanner name
-- **WHEN** the action reads the `dockerScanTools` catalogue
+- **WHEN** the action reads the scan tool catalogue
 - **THEN** the request body selects no `name`, and one request is enough
 
 #### Scenario: The gateway has no categories field
@@ -206,7 +206,7 @@ not a rejected optional field SHALL still abort the run.
 - **WHEN** an entry in `scan-tools` is a scanner's stored name rather than an id
 - **THEN** the action fails with a message stating that the entry is not a scan tool id and that
   this gateway does not resolve scanners by name, and pointing at `vulnara docker_scan_tools` and the
-  `dockerScanTools` query for the id
+  `scanTools` query for the id
 - **AND** the message does not claim the tool is unavailable to the tenant
 - **AND** no catalogue request is sent, because the entry's shape is knowable without the gateway
 
@@ -217,9 +217,9 @@ not a rejected optional field SHALL still abort the run.
 - **AND** the message does not claim the tool is unavailable to the tenant
 
 #### Scenario: Unknown tool requested
-- **WHEN** an entry in `scan-tools` is a well-formed id that matches no `dockerScanTools` id
+- **WHEN** an entry in `scan-tools` is a well-formed id that matches no catalogue id
 - **THEN** the action fails with a message naming the rejected entry and the tenant, and pointing
-  at `vulnara docker_scan_tools` and the `dockerScanTools` query for the ids the tenant may run
+  at `vulnara docker_scan_tools` and the `scanTools` query for the ids the tenant may run
 - **AND** the message names no scanner the platform offers
 
 #### Scenario: No usable tool entries

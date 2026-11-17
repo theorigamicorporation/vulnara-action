@@ -315,10 +315,10 @@ scan_tool_catalogue() {
 # category scan is one request that fans out server-side, which is
 # startRepositoryCategoryScan, not N of these.
 # Where a tool id comes from. The Vulnara application has no screen listing
-# scanner ids, so the hint names the two places that do: vulnara-cli's
-# docker_scan_tools command and the dockerScanTools query it runs. Both list ids
-# and categories only, never a scanner's name.
-TOOL_ID_HINT="List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those."
+# scanner ids, so the hint names the two places that do: the Vulnara CLI's
+# docker_scan_tools command and the scanTools query. Both list ids and
+# categories only, never a scanner's name.
+TOOL_ID_HINT="List the ids this workspace can run with 'vulnara docker_scan_tools' (the Vulnara CLI) or the GraphQL query 'scanTools { id categories }', and pass one of those."
 resolve_tools() {
   local raw t found=0
   IFS=',' read -ra wanted <<< "$SCAN_TOOLS"
