@@ -50,7 +50,7 @@ Three limits worth knowing:
 
 ## Scanners
 
-`scan-tools` takes scanner ids only, from Vulnara's `dockerScanTools`. Comma-separate for
+`scan-tools` takes scanner ids only, from Vulnara's `scanTools`. Comma-separate for
 several, and surrounding whitespace is trimmed. A scanner name is not accepted: the gateway no
 longer returns names, so there is nothing to match one against, and an entry that is not an id
 fails the run before any request is made.
@@ -65,12 +65,13 @@ vulnara docker_scan_tools
 or run the same GraphQL query against the gateway yourself:
 
 ```graphql
-{ dockerScanTools { items { id categories } } }
+{ scanTools { items { id categories } } }
 ```
 
-The action selects only `id` and `categories` from `dockerScanTools`. `categories` is optional: a
-gateway that predates the field rejects it with a validation error, the field is dropped and the
-query retried, and every scan is then labelled `Uncategorised`. Any GraphQL error that is not that
+The action selects only `id` and `categories` from the catalogue. It reads it through
+`dockerScanTools`, the older name of `scanTools`, which every gateway serves. `categories` is
+optional: a gateway that predates the field rejects it with a validation error, the field is
+dropped and the query retried, and every scan is then labelled `Uncategorised`. Any GraphQL error that is not that
 rejected field still aborts the run with the gateway's own wording.
 
 Nothing the action prints identifies a scanner. A scan is labelled by the **category** it covers,
@@ -99,7 +100,7 @@ worked — a CI log is world-readable on a public repository, and a typo should 
 roster:
 
 ```
-scan tool '00000000-0000-0000-0000-000000000000' is not available to tenant 'acme'. List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those.
+scan tool '00000000-0000-0000-0000-000000000000' is not available to tenant 'acme'. List the ids this workspace can run with 'vulnara docker_scan_tools' (the Vulnara CLI) or the GraphQL query 'scanTools { id categories }', and pass one of those.
 ```
 
 An entry that is not an id says so instead of blaming the tenant's scanner availability.
@@ -107,15 +108,16 @@ An entry that is not an id says so instead of blaming the tenant's scanner avail
 label belongs to a category scan rather than to this input:
 
 ```
-scan tool 'my-scanner' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those.
+scan tool 'my-scanner' is not a scan tool id. scan-tools takes ids: this Vulnara gateway does not resolve scanners by name, and a category label belongs to a category scan rather than to scan-tools. List the ids this workspace can run with 'vulnara docker_scan_tools' (the Vulnara CLI) or the GraphQL query 'scanTools { id categories }', and pass one of those.
 ```
 
 ## Resolving the repository
 
 `repository` defaults to `GITHUB_REPOSITORY`. The action first looks the repository up by the
 last segment of `repository` and takes the candidate whose git entity name equals the first
-segment, case-insensitively. That is the whole rule for GitHub, GitLab, Bitbucket and Forgejo,
-apart from the [first-result fallback](troubleshooting.md#the-wrong-repository-is-scanned).
+segment, case-insensitively. That is the whole rule for GitHub, GitLab, Bitbucket and Forgejo.
+When candidates come back but none is under that owner, the run fails and lists the owners it
+found, rather than scanning a same-named repository elsewhere.
 
 Vulnara stores an Azure DevOps repository as `<project>/<repo>` under a git entity named after
 the Azure organization, so when the first lookup finds no owner match the action searches for

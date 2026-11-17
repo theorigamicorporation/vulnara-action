@@ -17,7 +17,7 @@ scan of a registered web target, alongside the repository scans or on its own.
 - **Implementation language**: a single Bash script, `entrypoint.sh` (`set -euo pipefail`).
 - **Remote API**: Vulnara GraphQL gateway (default `https://vulnara-gw.rso.dev/graphql`),
   called with `curl` and parsed with `jq`. No SDK, no compiled binaries, no package manager.
-- **Auth**: OAuth 2.0 `client_credentials` grant against Authentik
+- **Auth**: OAuth 2.0 `client_credentials` grant against the Vulnara identity provider
   (default `https://auth.theorigamicorporation.com/application/o/token/`), exchanging a
   service-account username/token for a short-lived JWT.
 
@@ -76,8 +76,8 @@ repository from a workflow and pointing it at a non-prod Vulnara via the `*-url`
 - **Repository**: a repository must already exist in Vulnara and be enabled before it
   can be scanned. Private repositories additionally need a Vulnara **git token id**
   so the platform can clone them.
-- **Scan tool** (`dockerScanTools`): the scanners Vulnara can run, referenced by id, or by
-  the name the platform stores them under while the gateway still returns one. A scanner's
+- **Scan tool** (`scanTools`, formerly `dockerScanTools`): the scanners Vulnara can run,
+  referenced by id only. A scanner's
   identity is not a customer-facing fact: the action labels a scan by the **category** the
   scanner serves (`sast`, `sca`, `secrets`, `pii`, `dast`) and prints no scanner name or codename
   anywhere. An unresolvable category is shown as `Uncategorised`, display only.
@@ -104,6 +104,6 @@ repository from a workflow and pointing it at a non-prod Vulnara via the `*-url`
 ## External Dependencies
 
 - Vulnara GraphQL gateway — repository/tool lookup, scan start, status polling, findings.
-- Authentik OAuth token endpoint — service-account token exchange.
+- Vulnara identity provider OAuth token endpoint - service-account token exchange.
 - GitHub Actions runtime — `INPUT_*`, `GITHUB_REF_NAME`, `GITHUB_REPOSITORY`,
   `GITHUB_OUTPUT`, `GITHUB_STEP_SUMMARY`.

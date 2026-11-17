@@ -17,7 +17,7 @@ flowchart LR
     WF["GitHub workflow"]
     ACT["vulnara-action<br/>entrypoint.sh"]
     IDP["Vulnara identity provider<br/>token-url"]
-    GW["vulnara-gateway-api<br/>gateway-url"]
+    GW["Vulnara gateway<br/>gateway-url"]
     SCAN["Vulnara scanners"]
     APP["Vulnara web app<br/>app-url"]
 
@@ -69,7 +69,7 @@ sequenceDiagram
     I-->>A: JWT (expires_in)
     A->>G: 2. repositories(filter repositoryName)
     G-->>A: candidates, matched on owner
-    A->>G: 3. dockerScanTools
+    A->>G: 3. scan tool catalogue
     G-->>A: id and categories per tool
     loop per scanner
         A->>G: 4a. startRepositoryScan(repo, tool, branch)
@@ -93,8 +93,8 @@ sequenceDiagram
    candidates; the action picks the one whose git entity name matches the owner half of
    `repository`, case-insensitively. It prints the Vulnara id, provider, visibility, languages
    and enabled flag, and warns if the repository is disabled, or private with no
-   `git-token-id`. See [the resolution caveat](troubleshooting.md#the-wrong-repository-is-scanned).
-3. **Resolve the scanners.** `dockerScanTools` is queried once, with its selection set narrowed
+   `git-token-id`. When no candidate is under that owner, the run fails before any scan starts.
+3. **Resolve the scanners.** The scan tool catalogue is queried once, with its selection set narrowed
    to the fields the schema actually has, and each entry in `scan-tools` is matched against a
    tool id; names are not accepted. An unknown entry aborts
    the run before any scan is started; the failure names the entry that was rejected, never the

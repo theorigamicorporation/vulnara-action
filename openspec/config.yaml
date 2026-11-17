@@ -26,9 +26,9 @@ context: |
   Tech stack: single Bash script (entrypoint.sh, set -euo pipefail) on alpine:3.24
   with curl + jq; action.yml declares inputs/outputs; no build step, no tests, no CI.
 
-  Integrations: OAuth2 client_credentials against Authentik for the service-account
+  Integrations: OAuth2 client_credentials against the identity provider for the service-account
   JWT, then the Vulnara GraphQL gateway (X-Tenant header) for repositories,
-  dockerScanTools, startRepositoryScan, scanResult status polling and scanFindings.
+  scanTools (still requested as dockerScanTools), startRepositoryScan, scanResult status polling and scanFindings.
 
   Conventions: GraphQL bodies built with `jq -n`; inputs read via the input() helper
   (GitHub exposes them as INPUT_SERVICE-ACCOUNT with dashes); logs prefixed "vulnara:"

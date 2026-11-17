@@ -130,9 +130,11 @@ ensure_jwt() {
     --data-urlencode "username=$SERVICE_ACCOUNT" \
     --data-urlencode "password=$TOKEN" \
     --data-urlencode "scope=profile")"
-  JWT="$(echo "$resp" | jq -r '.access_token // empty')"
+  JWT="$(echo "$resp" | jq -r '.access_token // empty' 2>/dev/null || true)"
   if [ -z "$JWT" ]; then
-    echo "$resp" | jq -r '.error_description // .error // .' >&2
+    # The provider's own error fields only: any other body, such as a proxy's
+    # error page, can carry hosts and ids that do not belong in a public log.
+    echo "$resp" | jq -r '.error_description // .error // empty' >&2 2>/dev/null || true
     fail "could not authenticate the service account (check service-account/token/tenant)"
   fi
   local exp; exp="$(echo "$resp" | jq -r '.expires_in // 3600')"
@@ -195,7 +197,9 @@ resolve_repository() {
       fail "repository '$REPOSITORY' is ambiguous in Vulnara (tenant '$TENANT'): $(echo "$azure" | jq -r '[.[] | "\(.gitEntity.name)/\(.repositoryName)"] | join(", ")'). Pass the full org/project/repo."
     fi
     item="$(echo "$azure" | jq -c '.[0] // empty')"
-    [ -n "$item" ] || item="$(echo "$data" | jq -c '.repositories.items[0] // empty')"
+  fi
+  if [ -z "$item" ] && [ "$(echo "$data" | jq '.repositories.items | length')" -gt 0 ]; then
+    fail "repository '$REPOSITORY' was not found under '$owner' in Vulnara (tenant '$TENANT'). A repository named '$name' exists under these workspaces: $(echo "$data" | jq -r '[.repositories.items[] | .gitEntity.name // "?"] | unique | join(", ")'). Check the repository input, or that the workspace in Vulnara is named after the git owner."
   fi
   [ -n "$item" ] || fail "repository '$REPOSITORY' was not found in Vulnara (tenant '$TENANT'). Add it in Vulnara first."
   REPO_ID="$(echo "$item" | jq -r '.id')"
@@ -232,8 +236,8 @@ looks_like_id() {
 # customer surface, and a workflow log on a public repository is one of those.
 # The fallback is `Uncategorised`: display only. It is never stored, never
 # filtered on, and is not a category the platform knows about.
-# `dast` is named ahead of any scanner serving it (OpenProject #1292), so the
-# first scan that covers it is not labelled `Uncategorised`.
+# `dast` is named ahead of any scanner serving it, so the first scan that covers
+# it is not labelled `Uncategorised`.
 category_display() {
   case "$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')" in
     sast)    printf 'Code analysis' ;;
@@ -270,7 +274,7 @@ categories_display() { # comma-separated wire values -> display label
 # scanner name.
 #
 # `.categories` is still narrowable. `gateway-url` is an action input, so a
-# non-prod or self-hosted gateway predating that field is a real deployment, and
+# non-prod gateway predating that field is a real deployment, and
 # selecting it unconditionally would turn "labelled Uncategorised" into "the run
 # fails and starts no scan" for a tool id pinned in a workflow file we do not
 # control. Narrow the selection from the validation error and retry instead.
@@ -315,10 +319,10 @@ scan_tool_catalogue() {
 # category scan is one request that fans out server-side, which is
 # startRepositoryCategoryScan, not N of these.
 # Where a tool id comes from. The Vulnara application has no screen listing
-# scanner ids, so the hint names the two places that do: vulnara-cli's
-# docker_scan_tools command and the dockerScanTools query it runs. Both list ids
-# and categories only, never a scanner's name.
-TOOL_ID_HINT="List the ids this workspace can run with 'vulnara docker_scan_tools' (vulnara-cli) or the GraphQL query 'dockerScanTools { id categories }', and pass one of those."
+# scanner ids, so the hint names the two places that do: the Vulnara CLI's
+# docker_scan_tools command and the scanTools query. Both list ids and
+# categories only, never a scanner's name.
+TOOL_ID_HINT="List the ids this workspace can run with 'vulnara docker_scan_tools' (the Vulnara CLI) or the GraphQL query 'scanTools { id categories }', and pass one of those."
 resolve_tools() {
   local raw t found=0
   IFS=',' read -ra wanted <<< "$SCAN_TOOLS"

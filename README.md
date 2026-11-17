@@ -44,7 +44,7 @@ Five numbered steps, each printed to the log with a `vulnara:` prefix.
    `token` for a JWT, refreshed automatically 120 seconds before it expires so a long scan does
    not fail.
 2. **Resolve the repository.** Looked up by name in Vulnara and matched on the owner half of
-   `repository`. Warns if the repository is disabled, or private with no `git-token-id`.
+   `repository`; no match under that owner fails the run. Warns if the repository is disabled, or private with no `git-token-id`.
 3. **Resolve the scanners.** Each entry in `scan-tools` is matched against a tool id. Names
    are not accepted.
 4. **Start and await the scans.** One scan per scanner, all started up front, then polled every
@@ -69,7 +69,7 @@ flowchart LR
     IN["with:<br/>4 required, 12 optional"]
     ACT["entrypoint.sh<br/>bash, curl, jq"]
     IDP["identity provider<br/>token-url"]
-    GW["vulnara-gateway-api<br/>gateway-url"]
+    GW["Vulnara gateway<br/>gateway-url"]
     SCAN["Vulnara scanners"]
     OUT["GITHUB_OUTPUT<br/>scan-result-ids<br/>highest-severity<br/>passed"]
     SUM["GITHUB_STEP_SUMMARY<br/>findings tables"]
@@ -191,7 +191,7 @@ every refusal.
 | `service-account` | yes | | Service account username. |
 | `token` | yes | | Service account token. Pass it from a secret. |
 | `tenant` | yes | | Vulnara tenant (workspace) id. |
-| `scan-tools` | no | | Required unless a web input is set. Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (vulnara-cli) or the GraphQL query `dockerScanTools { id categories }`. |
+| `scan-tools` | no | | Required unless a web input is set. Comma-separated scan tool ids, ids only: names are rejected. List them with `vulnara docker_scan_tools` (the Vulnara CLI) or the GraphQL query `scanTools { id categories }`. |
 | `branch` | no | triggering branch | Branch to scan. |
 | `repository` | no | current repo | `owner/name` to resolve in Vulnara. |
 | `git-token-id` | no | | Vulnara git token id (private repositories). |
@@ -223,27 +223,14 @@ environment the action reads: [docs/configuration.md](docs/configuration.md).
 |---|---|
 | [Architecture](docs/architecture.md) | Diagrams, components, the five-step flow, the request shape |
 | [Configuration](docs/configuration.md) | Every input, output, validation rule and environment variable |
-| [Reference](docs/reference.md) | The severity gate, the scanner codenames, the job summary contract |
-| [Troubleshooting](docs/troubleshooting.md) | Two known issues, then the common failures |
+| [Reference](docs/reference.md) | The severity gate, the scan categories, the job summary contract |
+| [Troubleshooting](docs/troubleshooting.md) | One known issue, then the common failures |
 | [Development](docs/development.md) | Local checks, non-prod runs, conventions, releasing |
 | [Testing](docs/testing.md) | The offline suite, the lint and build gates, the end-to-end cases |
 | [Specifications](openspec/specs/) | The normative behaviour: 4 capabilities, 24 requirements, 87 scenarios |
 
-Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. Two known issues
-remain: repository resolution falls back to the first result when no owner matches, so a
-same-named repository under another owner can be scanned instead, and `wait-timeout` bounds each
-scan rather than the run.
-
-## Related repositories
-
-Part of the [Vulnara](https://github.com/theorigamicorporation/vulnara-dev) platform.
-Start there for the local stack and the architecture overview.
-
-| Repo | Relationship |
-|---|---|
-| [vulnara-gateway-api](https://github.com/theorigamicorporation/vulnara-gateway-api) | The only API this action calls. Owns authentication, tenancy and every query and mutation used here |
-| [vulnara-cli](https://github.com/theorigamicorporation/vulnara-cli) | The terminal equivalent of this action against the same gateway |
-| [vulnara-dev](https://github.com/theorigamicorporation/vulnara-dev) | Local stack, for running a non-production gateway to develop against |
+Read [Troubleshooting](docs/troubleshooting.md) before trusting a green build. One known issue
+remains: `wait-timeout` bounds each scan rather than the run.
 
 ## Contributing
 

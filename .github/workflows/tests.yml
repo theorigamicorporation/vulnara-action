@@ -18,11 +18,12 @@ permissions:
 jobs:
   tests:
     name: shell tests
-    runs-on: o4-k8s-runner-set-o4
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
-      # The self-hosted runner image ships bash and jq but not shellcheck.
+      # Installed explicitly so the lint does not depend on what the runner image
+      # happens to ship.
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
 
@@ -40,7 +41,7 @@ jobs:
 
   docker:
     name: docker image builds
-    runs-on: o4-k8s-runner-set-o4
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
       - name: Build the action image

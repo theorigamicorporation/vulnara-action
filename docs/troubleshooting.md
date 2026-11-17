@@ -2,25 +2,10 @@
 
 [Back to the README](../README.md)
 
-Two known issues in the action itself, then the failures that come from configuration or the
+One known issue in the action itself, then the failures that come from configuration or the
 platform.
 
 ## Known issues
-
-### The wrong repository is scanned
-
-Repository resolution at `entrypoint.sh:115-122` queries by repository **name** only, then
-prefers the candidate whose git entity name equals the owner half of `repository`,
-case-insensitively. If no candidate matches, it falls back to `.items[0]`, the first result the
-API returned.
-
-So when two repositories in the tenant share a name under different owners and the owner match
-fails, for example because the entity is recorded in Vulnara under a different name than the
-GitHub owner, the action can resolve, scan and gate on the other one.
-
-The resolved repository is printed in step 2 as `Repository` and `Vulnara id`, and appears in
-the job summary. Check it whenever a scan reports findings you do not recognise, or reports
-none where you expected some.
 
 ### A multi-scanner run takes far longer than `wait-timeout`
 
@@ -50,6 +35,13 @@ scans hang.
 The repository has not been added to the tenant, or the service account cannot see it. Add it
 in Vulnara first, and check `tenant` matches the workspace it lives in.
 
+### `repository '<owner>/<name>' was not found under '<owner>' in Vulnara`
+
+Vulnara holds a repository with that name, but under a different workspace than the owner half of
+`repository`. The failure lists the workspaces it found. Usually the workspace is recorded in
+Vulnara under a different name than the git owner: fix `repository`, or make the names match.
+The action never scans a same-named repository under another owner in place of the one asked for.
+
 ### `could not authenticate the service account`
 
 The `client_credentials` exchange returned no `access_token`. The response's
@@ -68,7 +60,7 @@ lacks access to that repository or tool.
 
 The action warns `repository is private but no git-token-id was provided` and starts the scan
 anyway. The scan then fails on the platform side and the job fails with
-`scan for '<codename>' ended as FAILED`. Pass a valid `git-token-id`.
+`scan for '<category>' ended as FAILED`. Pass a valid `git-token-id`.
 
 ### `repository ... is disabled in Vulnara`
 
@@ -103,7 +95,7 @@ network or on an internal host name cannot be.
 
 More than one web target has that base URL. Pass the one to scan as `web-target-id`.
 
-### `timed out after <n>s waiting for '<codename>'`
+### `timed out after <n>s waiting for '<category>'`
 
 The scan did not reach a terminal state inside `wait-timeout`. The scan itself keeps running on
 the platform; open it at `<app-url>/repository-scans/<id>` to see where it got to, and raise

@@ -47,10 +47,10 @@ build all request bodies with `jq -n` so input values are JSON-encoded.
 
 ### Requirement: Resolve the repository in Vulnara
 The system SHALL query `repositories` filtered by `repositoryName` equal to the name part of
-the `owner/name` repository input, and select the item whose `gitEntity.name` matches the
-owner case-insensitively, falling back to the first returned item. It SHALL record the
-repository id, full name, provider (`gitType`), visibility, enabled flag, programming
-languages and browsing URL.
+the `owner/name` repository input, and select the item whose `gitEntity.name` matches the owner
+case-insensitively. It SHALL NOT fall back to another item when no `gitEntity.name` matches the
+owner. It SHALL record the repository id, full name, provider (`gitType`), visibility, enabled
+flag, programming languages and browsing URL.
 
 #### Scenario: Repository resolved and reported
 - **WHEN** the query returns a repository whose `gitEntity.name` matches the owner
@@ -63,6 +63,13 @@ languages and browsing URL.
 - **WHEN** the query returns no items
 - **THEN** the action fails with a message stating the repository was not found in Vulnara
   for the tenant and that it must be added first
+
+#### Scenario: No returned repository belongs to the requested owner
+- **WHEN** the query returns one or more items and none has a `gitEntity.name` equal to the
+  owner case-insensitively
+- **THEN** the action fails with a message naming the requested `owner/name` and the tenant,
+  and listing the `gitEntity.name` of every returned item
+- **AND** no scan is started
 
 #### Scenario: Repository is disabled
 - **WHEN** the resolved repository has `enabled: false`
@@ -159,7 +166,7 @@ needs to know that what they asked for was rejected, not what else exists.
 - **AND** the tool's stored name appears in no log line, annotation, summary row or output
 
 ### Requirement: Resolve the requested scan tools by id
-The system SHALL read the `dockerScanTools` catalogue for the tenant and resolve every entry in
+The system SHALL read the scan tool catalogue for the tenant and resolve every entry in
 `scan-tools` to a tool id, failing the run with a message naming the rejected entry when an entry
 does not resolve. It SHALL map each matched tool to the category label it covers before the resolved
 list leaves the resolver, so that no caller holds a scanner identity to print.
@@ -170,11 +177,11 @@ resolve scanners by name, states that a category label belongs to a category sca
 `scan-tools`, and points at where the ids are listed. It SHALL NOT report a non-id entry as
 unavailable to the tenant, which sends the caller to look for a scanner that is present.
 
-Where a failure points the caller at the ids, it SHALL name vulnara-cli's `docker_scan_tools`
-command and the `dockerScanTools { id categories }` query. The Vulnara application has no screen
+Where a failure points the caller at the ids, it SHALL name the Vulnara CLI's `docker_scan_tools`
+command and the `scanTools { id categories }` query. The Vulnara application has no screen
 listing scanner ids, so a message sending the caller there sends them nowhere.
 
-The selection set SHALL NOT include `name`. The gateway has removed `DockerScanTool.name`, so
+The selection set SHALL NOT include `name`. The gateway has removed the scan tool `name` field, so
 requesting it would fail the whole query before any id was matched, and nothing in this action would
 print the value if it came back. `categories` SHALL remain optional: when the gateway rejects it with
 a field-level validation error, the field SHALL be dropped from the selection and the query retried,
@@ -188,7 +195,7 @@ not a rejected optional field SHALL still abort the run.
 - **AND** each resolved tool is listed under its category label alongside its id
 
 #### Scenario: The catalogue query requests no scanner name
-- **WHEN** the action reads the `dockerScanTools` catalogue
+- **WHEN** the action reads the scan tool catalogue
 - **THEN** the request body selects no `name`, and one request is enough
 
 #### Scenario: The gateway has no categories field
@@ -206,7 +213,7 @@ not a rejected optional field SHALL still abort the run.
 - **WHEN** an entry in `scan-tools` is a scanner's stored name rather than an id
 - **THEN** the action fails with a message stating that the entry is not a scan tool id and that
   this gateway does not resolve scanners by name, and pointing at `vulnara docker_scan_tools` and the
-  `dockerScanTools` query for the id
+  `scanTools` query for the id
 - **AND** the message does not claim the tool is unavailable to the tenant
 - **AND** no catalogue request is sent, because the entry's shape is knowable without the gateway
 
@@ -217,9 +224,9 @@ not a rejected optional field SHALL still abort the run.
 - **AND** the message does not claim the tool is unavailable to the tenant
 
 #### Scenario: Unknown tool requested
-- **WHEN** an entry in `scan-tools` is a well-formed id that matches no `dockerScanTools` id
+- **WHEN** an entry in `scan-tools` is a well-formed id that matches no catalogue id
 - **THEN** the action fails with a message naming the rejected entry and the tenant, and pointing
-  at `vulnara docker_scan_tools` and the `dockerScanTools` query for the ids the tenant may run
+  at `vulnara docker_scan_tools` and the `scanTools` query for the ids the tenant may run
 - **AND** the message names no scanner the platform offers
 
 #### Scenario: No usable tool entries
@@ -235,9 +242,8 @@ when its `repositoryName` equals the input with the first segment removed and it
 `gitEntity.name` equals that first segment case-insensitively (`{org}/{project}/{repo}`), when
 its `repositoryName` equals the whole input (`{project}/{repo}`), or when its `gitEntity.name`
 equals the first segment case-insensitively and the last segment of its `repositoryName` equals
-the last segment of the input (`{org}/{repo}`). Exactly one match SHALL be resolved and SHALL
-take precedence over the fall back to the first returned item. More than one match SHALL fail
-the run. Items of any other `gitType` SHALL NOT be matched by this rule.
+the last segment of the input (`{org}/{repo}`). Exactly one match SHALL be resolved. More
+than one match SHALL fail the run. Items of any other `gitType` SHALL NOT be matched by this rule.
 
 #### Scenario: Azure repository matched by organization, project and name
 - **WHEN** `repository` is `acme/web/widgets` and Vulnara holds `web/widgets` under the
@@ -259,7 +265,8 @@ the run. Items of any other `gitType` SHALL NOT be matched by this rule.
 #### Scenario: Other providers are not matched by the Azure rule
 - **WHEN** the owner match finds nothing and the search returns only items whose `gitType` is
   not `azure_devops`
-- **THEN** resolution behaves as it did before this requirement
+- **THEN** no Azure DevOps item is resolved, and the run fails as described in `Resolve the
+  repository in Vulnara`
 
 ### Requirement: Build a browsing URL for every provider
 The system SHALL build the Azure DevOps browsing URL as `<htmlUrl>/<project>/_git/<repo>`

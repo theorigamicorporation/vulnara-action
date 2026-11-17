@@ -1,6 +1,6 @@
 ## Why
 
-DAST is becoming a platform category (OpenProject #1292, part of the DAST beta under #778):
+DAST is becoming a platform category, as part of the DAST beta:
 `dast`, labelled "Web application". `category_display` fails closed, so until it knows the value
 a scan covering it is logged and summarised as `Uncategorised`. Naming it before any scanner
 serves it means the first such scan is labelled correctly.
